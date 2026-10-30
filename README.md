@@ -140,4 +140,4 @@ Where a source is silent, the registry says so in `notes`. For example, PLIP and
 3. Otherwise, add a module under `backend/runners/` that returns `{"summary": [...], "panels": [...]}` using the existing panel types (`scatter`, `matrix`, `bars`, `spatial`, `channels`, `vector`, `table`, `image`, `note`), and register it in `runners/__init__.py`.
 
 ## Licence and use
-This portal's code is yours to licence. Each model keeps its own licence, and most are **non-commercial** (CC-BY-NC-ND-4.0 and similar). TRIDENT itself is CC-BY-NC-ND-4.0. For research use only; not for clinical decision-making.
+This portal's code is MIT licence. Each model keeps its own licence, and most are **non-commercial** (CC-BY-NC-ND-4.0 and similar). TRIDENT itself is CC-BY-NC-ND-4.0. For research use only; not for clinical decision-making. Copyright @Prajwal Ghimire.
