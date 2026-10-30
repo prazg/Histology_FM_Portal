@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Histology FM Portal</title>
+<meta name="description" content="Run open-weight histology foundation models — patch and slide encoders, vision–language zero-shot, virtual multiplex (GigaTIME, HEX) and spatial expression (STPath) — from one interface.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 16'%3E%3Crect width='32' height='16' rx='2' fill='%23c2407a'/%3E%3Crect width='11' height='16' fill='%23ffffffcc'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,500..800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <a class="brand" href="#models" aria-label="Histology FM Portal home">
+      <span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Histology FM Portal</span>
+    </a>
+    <nav class="tabs" aria-label="Sections">
+      <button data-view="models">Models</button>
+      <button data-view="run">Run</button>
+      <button data-view="results">Results</button>
+      <button data-view="connect">Connect</button>
+    </nav>
+    <div class="conn">
+      <button class="pill" id="connPill" data-view="connect" aria-live="polite"><span class="dot" id="connDot"></span><span id="connText">Not connected</span></button>
+      <button class="icon-btn" id="themeBtn" aria-label="Switch light or dark theme" title="Brightfield / darkfield">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- ═════════════ MODELS ═════════════ -->
+  <section id="view-models" aria-labelledby="h-models">
+    <div class="intro">
+      <div>
+        <h1 id="h-models">Open-weight histology foundation models on one bench.</h1>
+        <p>Pick a model, give it tiles or a whole slide, and get the output its training was built for: embeddings and cluster maps, zero-shot class maps, virtual multiplex marker maps, or predicted spatial expression. Models run on your own GPU server; this page never sees your images.</p>
+      </div>
+      <div class="counts" id="counts"></div>
+    </div>
+    <div class="cat-layout">
+      <aside class="filters" aria-label="Filter models">
+        <div>
+          <label class="sr-only" for="q">Search models</label>
+          <input id="q" class="search" type="search" placeholder="Search name, lab or licence">
+        </div>
+        <div>
+          <h3>Model family</h3>
+          <ul class="fam-list" id="famList"></ul>
+        </div>
+        <div>
+          <h3>Access</h3>
+          <label class="check"><input type="checkbox" id="fCommercial"> Commercial use allowed</label>
+          <label class="check"><input type="checkbox" id="fUngated"> No Hugging Face access request</label>
+          <label class="check"><input type="checkbox" id="fReady"> Ready on my server</label>
+        </div>
+        <p class="small muted">Weights, dimensions and licences checked on <span id="regDate"></span> against the TRIDENT encoder tables and each model card. Licences change — read the model card before publishing results.</p>
+      </aside>
+      <div id="rack"></div>
+    </div>
+  </section>
+
+  <!-- ═════════════ RUN ═════════════ -->
+  <section id="view-run" aria-labelledby="h-run" hidden>
+    <h2 id="h-run" style="margin-bottom:6px">Run a model</h2>
+    <p class="muted">Jobs queue on your server and run one at a time on its GPU.</p>
+    <div class="run-layout">
+      <form id="runForm" autocomplete="off">
+        <div class="step"><span class="step-n">1</span><div>
+          <h3>Model</h3>
+          <div class="field"><label for="rModel">Foundation model</label><select id="rModel" required></select>
+            <span class="hint" id="rModelHint"></span></div>
+        </div></div>
+        <div class="step"><span class="step-n">2</span><div>
+          <h3>Task</h3>
+          <div class="seg-ctl" id="rTasks" role="group" aria-label="Task"></div>
+          <div id="rTaskDesc" class="small muted"></div>
+        </div></div>
+        <div class="step"><span class="step-n">3</span><div>
+          <h3 id="rInputTitle">Input</h3>
+          <div id="tileInput">
+            <label class="drop" id="drop" tabindex="0">
+              <input type="file" id="tileFiles" accept="image/png,image/jpeg,image/tiff,image/webp" multiple hidden>
+              <strong>Drop H&amp;E tiles here</strong> or choose files<br><span class="small">PNG, JPEG or TIFF crops. Each tile is resized to the model's input.</span>
+            </label>
+            <div class="thumbs" id="tileThumbs"></div>
+          </div>
+          <div id="wsiInput" hidden>
+            <div class="seg-ctl" role="group" aria-label="Slide source">
+              <button type="button" data-src="path" aria-pressed="true">Path on server</button>
+              <button type="button" data-src="upload" aria-pressed="false">Upload</button>
+            </div>
+            <div class="field" id="wsiPathField"><label for="wsiPath">Slide path on the backend machine</label>
+              <input type="text" id="wsiPath" placeholder="/data/wsi/TCGA-GBM/TCGA-06-0125-01Z-00-DX1.svs">
+              <span class="hint">Must sit inside a folder listed in <code>allowed_wsi_roots</code>. Best for multi-GB slides.</span></div>
+            <div class="field" id="wsiUploadField" hidden><label for="wsiFile">Slide file</label>
+              <input type="file" id="wsiFile" accept=".svs,.ndpi,.tif,.tiff,.mrxs,.scn,.czi,.png,.jpg,.jpeg">
+              <span class="hint">Uploads go to your server, not to GitHub. Large slides upload slowly — use a server path when you can.</span></div>
+          </div>
+        </div></div>
+        <div class="step"><span class="step-n">4</span><div>
+          <h3>Settings</h3>
+          <div id="rParams"></div>
+        </div></div>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding-top:6px">
+          <button class="btn" id="runBtn" type="submit">Run model</button>
+          <span id="runMsg" class="small" role="status"></span>
+        </div>
+      </form>
+      <div class="aside" id="runAside"></div>
+    </div>
+  </section>
+
+  <!-- ═════════════ RESULTS ═════════════ -->
+  <section id="view-results" aria-labelledby="h-res" hidden>
+    <h2 id="h-res" class="sr-only">Results</h2>
+    <div class="res-layout">
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h3>Jobs</h3><button class="btn ghost small" id="refreshJobs" type="button">Refresh</button>
+        </div>
+        <ul class="joblist" id="jobList"></ul>
+      </div>
+      <div id="jobView" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- ═════════════ CONNECT ═════════════ -->
+  <section id="view-connect" aria-labelledby="h-conn" hidden>
+    <h2 id="h-conn" style="margin-bottom:6px">Connect a backend</h2>
+    <p class="muted">GitHub Pages only serves this page. The models run in the small Python server in <code>backend/</code>, on whichever machine has the GPU.</p>
+    <div class="connect-layout">
+      <form id="connForm" autocomplete="off">
+        <div class="mode-cards" role="radiogroup" aria-label="Mode">
+          <label><input type="radio" name="mode" value="server" checked><strong>My server</strong>
+            <span class="d">Real inference on your workstation, HPC node or cloud GPU.</span></label>
+          <label><input type="radio" name="mode" value="demo"><strong>Demo</strong>
+            <span class="d">Synthetic outputs generated in the browser so you can explore the interface. No model runs.</span></label>
+        </div>
+        <div id="serverFields">
+          <div class="field"><label for="cUrl">Backend URL</label><input type="url" id="cUrl" placeholder="http://127.0.0.1:8000">
+            <span class="hint">Local server: http://127.0.0.1:8000. Remote GPU: use an HTTPS tunnel URL — browsers block plain-HTTP calls from an HTTPS page except to localhost.</span></div>
+          <div class="field"><label for="cKey">Portal key</label><input type="password" id="cKey" placeholder="Same as portal_key in config.yaml">
+            <label class="check"><input type="checkbox" id="cRemember"> Remember the key on this device</label></div>
+          <div class="field"><label for="cHf">Hugging Face token (optional)</label><input type="password" id="cHf" placeholder="hf_…">
+            <span class="hint">Sent with each job so the server can download gated weights you have access to. Kept for this tab only. Logging in on the server (<code>hf auth login</code>) avoids this.</span></div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="btn" type="submit">Connect</button>
+          <span id="connMsg" class="small" role="status"></span>
+        </div>
+      </form>
+      <div class="aside">
+        <div class="card" id="serverStatus"><h3>Server status</h3><p class="muted small">Connect to see GPU, packages and which models are ready.</p></div>
+        <div class="card">
+          <h3>Start the backend</h3>
+          <ol class="setup small">
+            <li>On the GPU machine: <code>cd backend</code>, then <code>pip install -r requirements.txt</code> and install TRIDENT as described in that file.</li>
+            <li>Copy <code>config.example.yaml</code> to <code>config.yaml</code>. Add this page's origin, a portal key, your slide folders and the GigaTIME / HEX / STPath clones.</li>
+            <li>Run <code>python -m uvicorn server:app --host 127.0.0.1 --port 8000</code>.</li>
+            <li>Remote machine? Forward the port over SSH (<code>ssh -L 8000:127.0.0.1:8000 gpu-node</code>) and keep the URL as 127.0.0.1, or put it behind an HTTPS tunnel.</li>
+            <li>Gated models: request access on each Hugging Face model page first, then log in on the server.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Research use only — not for clinical decision-making. Most weights here are licensed for non-commercial use; each model card is linked from its slide.
+  Built on <a href="https://github.com/mahmoodlab/TRIDENT">TRIDENT</a> for slide handling and encoder loading.
+</footer>
+
+<dialog class="drawer" id="drawer" aria-labelledby="drawerTitle"></dialog>
+
+<script src="assets/viewers.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

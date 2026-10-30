@@ -1,0 +1,6 @@
+backend/work/
+backend/config.yaml
+backend/external/
+external/
+__pycache__/
+*.pyc

@@ -1,0 +1,22 @@
+# Server
+fastapi>=0.110
+uvicorn[standard]
+python-multipart
+numpy
+pillow
+pyyaml
+h5py
+huggingface_hub
+
+# Models (install torch/torchvision for your CUDA first: https://pytorch.org/get-started/locally/)
+torch
+torchvision
+transformers            # TITAN, KEEP, PLIP, MUSK tokenizer
+open_clip_torch         # QuiltNet
+# TRIDENT — patch/slide encoders, segmentation, WSI reading. Not on PyPI:
+#   git clone https://github.com/mahmoodlab/TRIDENT external/TRIDENT
+#   pip install -e "external/TRIDENT[patch-encoders,slide-encoders]"
+#   trident-doctor --profile patch-encoders --check-gated
+# CONCH (zero-shot):  pip install git+https://github.com/Mahmoodlab/CONCH.git
+# MUSK (zero-shot, HEX backbone): clone lilab-stanford/MUSK and pip install it, or set musk_path
+# STPath: also needs anndata (pulled in by the STPath repo's requirements)

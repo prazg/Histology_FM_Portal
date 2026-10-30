@@ -1,0 +1,31 @@
+# Copy to config.yaml and edit. Every key is optional; env vars PORTAL_* override these.
+
+work_dir: ./work                 # job inputs/outputs (can grow large; slides are copied here when uploaded)
+
+# Browser origins allowed to call this server. Add your GitHub Pages origin, e.g. https://prazneuro.github.io
+origins:
+  - "https://YOUR-GITHUB-USERNAME.github.io"
+  - "http://localhost:8080"
+  - "http://127.0.0.1:8080"
+
+# Shared secret. Required whenever the server is reachable from anything other than this machine.
+# Enter the same value under Connect in the portal.
+portal_key: "change-me-to-a-long-random-string"
+
+# Folders the portal may read slides from by server path (avoids uploading multi-GB WSIs through the browser).
+allowed_wsi_roots:
+  - /data/wsi/TCGA-GBM
+  # - "C:/Users/pg22/Downloads"
+
+device: auto                     # auto | cuda | cuda:1 | cpu
+mock: false                      # true = synthetic outputs, no weights (wiring tests only)
+max_upload_mb: 4096
+
+# ── Runners outside TRIDENT ───────────────────────────────────────────────────
+gigatime_repo: ./external/GigaTIME        # git clone https://github.com/prov-gigatime/GigaTIME
+hex_repo: ./external/HEX                  # git clone https://github.com/lilab-stanford/HEX
+musk_path: ./external/MUSK                # folder containing the `musk` package (skip if pip-installed)
+hex_checkpoint: null                      # path to hex_nolan48.pt; null = download zli1893/hex_nolan48
+hex_extra_pythonpath: []                  # e.g. [./external/shim] for an openslide→tiffslide shim on Windows
+stpath_repo: ./external/STPath            # git clone https://github.com/Graph-and-Geometric-Learning/STPath
+stpath_weights: null                      # path to stfm.pth; null = download tlhuang/STPath

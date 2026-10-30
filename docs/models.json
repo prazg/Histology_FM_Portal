@@ -1,0 +1,1341 @@
+{
+ "version": "2026-10-29",
+ "verified_against": {
+  "T": "TRIDENT README encoder tables (github.com/mahmoodlab/TRIDENT, main @ 2026-10-29)",
+  "HF": "Hugging Face model card / file listing (2026-10-29)",
+  "GH": "Model's own GitHub README / notebooks (2026-10-29)"
+ },
+ "categories": {
+  "patch": {
+   "label": "Patch encoders",
+   "blurb": "Self-supervised vision encoders that turn each tile into an embedding."
+  },
+  "vl": {
+   "label": "Vision–language",
+   "blurb": "Image and text in one space: zero-shot classification with your own prompts."
+  },
+  "slide": {
+   "label": "Slide encoders",
+   "blurb": "Aggregate patch embeddings into one vector per slide."
+  },
+  "vmif": {
+   "label": "Virtual multiplex",
+   "blurb": "Predict protein marker maps (mIF / CODEX) from H&E."
+  },
+  "st": {
+   "label": "Spatial transcriptomics",
+   "blurb": "Predict spot-level gene expression from H&E."
+  },
+  "seg": {
+   "label": "Tissue segmentation",
+   "blurb": "Separate tissue from background before patching."
+  }
+ },
+ "tasks": {
+  "embed_tiles": {
+   "label": "Embed tiles",
+   "input": "tiles",
+   "outputs": [
+    "Embeddings (.h5)",
+    "PCA map coloured by k-means cluster",
+    "Cosine-similarity matrix"
+   ]
+  },
+  "embed_wsi": {
+   "label": "Embed a slide",
+   "input": "wsi",
+   "outputs": [
+    "Patch embeddings (.h5, TRIDENT format)",
+    "Spatial k-means cluster map",
+    "PCA-as-RGB map"
+   ]
+  },
+  "zeroshot_tiles": {
+   "label": "Zero-shot classify tiles",
+   "input": "tiles",
+   "outputs": [
+    "Class probabilities per tile",
+    "Per-tile bar chart"
+   ]
+  },
+  "zeroshot_wsi": {
+   "label": "Zero-shot map a slide",
+   "input": "wsi",
+   "outputs": [
+    "Per-class probability heatmaps",
+    "Predicted-class map",
+    "Slide-level class scores"
+   ]
+  },
+  "slide_embed": {
+   "label": "Slide embedding",
+   "input": "wsi",
+   "outputs": [
+    "Slide vector (.h5)",
+    "Tissue contour preview"
+   ]
+  },
+  "slide_zeroshot": {
+   "label": "Zero-shot classify a slide",
+   "input": "wsi",
+   "outputs": [
+    "Slide-level class scores",
+    "Slide vector"
+   ]
+  },
+  "vmif_tiles": {
+   "label": "Virtual multiplex on tiles",
+   "input": "tiles",
+   "outputs": [
+    "Marker maps per tile",
+    "Marker intensity matrix"
+   ]
+  },
+  "vmif_wsi": {
+   "label": "Virtual multiplex on a slide",
+   "input": "wsi",
+   "outputs": [
+    "Per-marker spatial maps",
+    "Marker summary table",
+    "Predictions (.h5 / .csv)"
+   ]
+  },
+  "st_wsi": {
+   "label": "Predict spatial expression",
+   "input": "wsi",
+   "outputs": [
+    "Spot × gene AnnData (.h5ad)",
+    "Gene expression maps"
+   ]
+  },
+  "segment_wsi": {
+   "label": "Segment tissue",
+   "input": "wsi",
+   "outputs": [
+    "Contour overlay",
+    "GeoJSON (opens in QuPath)"
+   ]
+  }
+ },
+ "models": [
+  {
+   "id": "uni_v1",
+   "name": "UNI",
+   "developer": "Mahmood Lab",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "uni_v1",
+   "embed_dim": 1024,
+   "patch_size": 256,
+   "mag": 20,
+   "hf_repo": "MahmoodLab/UNI",
+   "link": "https://huggingface.co/MahmoodLab/UNI",
+   "licence": "CC-BY-NC-ND-4.0",
+   "commercial_use": false,
+   "gated": true,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "uni_v2",
+   "name": "UNI2-h",
+   "developer": "Mahmood Lab",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "uni_v2",
+   "embed_dim": 1536,
+   "patch_size": 256,
+   "mag": 20,
+   "hf_repo": "MahmoodLab/UNI2-h",
+   "link": "https://huggingface.co/MahmoodLab/UNI2-h",
+   "licence": "CC-BY-NC-ND-4.0",
+   "commercial_use": false,
+   "gated": true,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "conch_v15",
+   "name": "CONCH v1.5",
+   "developer": "Mahmood Lab",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "conch_v15",
+   "embed_dim": 768,
+   "patch_size": 512,
+   "mag": 20,
+   "hf_repo": "MahmoodLab/conchv1_5",
+   "link": "https://huggingface.co/MahmoodLab/conchv1_5",
+   "licence": "CC-BY-NC-ND-4.0",
+   "commercial_use": false,
+   "gated": true,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": "Vision tower used by TITAN. Text encoder is only exposed through TITAN, so zero-shot runs at slide level (see TITAN)."
+  },
+  {
+   "id": "virchow",
+   "name": "Virchow",
+   "developer": "Paige",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "virchow",
+   "embed_dim": 2560,
+   "patch_size": 224,
+   "mag": 20,
+   "hf_repo": "paige-ai/Virchow",
+   "link": "https://huggingface.co/paige-ai/Virchow",
+   "licence": "Apache-2.0",
+   "commercial_use": true,
+   "gated": true,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "virchow2",
+   "name": "Virchow2",
+   "developer": "Paige",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "virchow2",
+   "embed_dim": 2560,
+   "patch_size": 224,
+   "mag": 20,
+   "hf_repo": "paige-ai/Virchow2",
+   "link": "https://huggingface.co/paige-ai/Virchow2",
+   "licence": "CC-BY-NC-ND-4.0",
+   "commercial_use": false,
+   "gated": true,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": "2560-d = CLS token concatenated with mean of patch tokens (register tokens 1-4 skipped)."
+  },
+  {
+   "id": "virchow2-cls",
+   "name": "Virchow2 (CLS only)",
+   "developer": "Paige",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "virchow2-cls",
+   "embed_dim": 1280,
+   "patch_size": 224,
+   "mag": 20,
+   "hf_repo": "paige-ai/Virchow2",
+   "link": "https://huggingface.co/paige-ai/Virchow2",
+   "licence": "CC-BY-NC-ND-4.0",
+   "commercial_use": false,
+   "gated": true,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "phikon",
+   "name": "Phikon",
+   "developer": "Owkin",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "phikon",
+   "embed_dim": 768,
+   "patch_size": 224,
+   "mag": 20,
+   "hf_repo": "owkin/phikon",
+   "link": "https://huggingface.co/owkin/phikon",
+   "licence": "Owkin non-commercial",
+   "commercial_use": false,
+   "gated": false,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "phikon_v2",
+   "name": "Phikon-v2",
+   "developer": "Owkin",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "phikon_v2",
+   "embed_dim": 1024,
+   "patch_size": 224,
+   "mag": 20,
+   "hf_repo": "owkin/phikon-v2",
+   "link": "https://huggingface.co/owkin/phikon-v2",
+   "licence": "Owkin non-commercial",
+   "commercial_use": false,
+   "gated": false,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "gigapath",
+   "name": "Prov-GigaPath (tile)",
+   "developer": "Providence / Microsoft",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "gigapath",
+   "embed_dim": 1536,
+   "patch_size": 256,
+   "mag": 20,
+   "hf_repo": "prov-gigapath/prov-gigapath",
+   "link": "https://huggingface.co/prov-gigapath/prov-gigapath",
+   "licence": "Apache-2.0",
+   "commercial_use": true,
+   "gated": true,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": "Tile encoder. Its LongNet slide encoder is listed separately under slide encoders. Also feeds STPath."
+  },
+  {
+   "id": "gigapath-flash",
+   "name": "Prov-GigaPath-Flash (tile)",
+   "developer": "Providence / Microsoft",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "gigapath-flash",
+   "embed_dim": 384,
+   "patch_size": 256,
+   "mag": 20,
+   "hf_repo": "prov-gigapath/prov-gigapath-flash",
+   "link": "https://huggingface.co/prov-gigapath/prov-gigapath-flash",
+   "licence": "Apache-2.0",
+   "commercial_use": true,
+   "gated": true,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "hoptimus0",
+   "name": "H-optimus-0",
+   "developer": "Bioptimus",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "hoptimus0",
+   "embed_dim": 1536,
+   "patch_size": 224,
+   "mag": 20,
+   "hf_repo": "bioptimus/H-optimus-0",
+   "link": "https://huggingface.co/bioptimus/H-optimus-0",
+   "licence": "Apache-2.0",
+   "commercial_use": true,
+   "gated": true,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "hoptimus1",
+   "name": "H-optimus-1",
+   "developer": "Bioptimus",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "hoptimus1",
+   "embed_dim": 1536,
+   "patch_size": 224,
+   "mag": 20,
+   "hf_repo": "bioptimus/H-optimus-1",
+   "link": "https://huggingface.co/bioptimus/H-optimus-1",
+   "licence": "CC-BY-NC-ND-4.0",
+   "commercial_use": false,
+   "gated": true,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "h0-mini",
+   "name": "H0-mini",
+   "developer": "Bioptimus",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "h0-mini",
+   "embed_dim": "768 / 1536",
+   "patch_size": 224,
+   "mag": 20,
+   "hf_repo": "bioptimus/H0-mini",
+   "link": "https://huggingface.co/bioptimus/H0-mini",
+   "licence": "CC-BY-NC-ND-4.0",
+   "commercial_use": false,
+   "gated": true,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "midnight12k",
+   "name": "Midnight-12k",
+   "developer": "Kaiko",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "midnight12k",
+   "embed_dim": 3072,
+   "patch_size": 224,
+   "mag": 20,
+   "hf_repo": "kaiko-ai/midnight",
+   "link": "https://huggingface.co/kaiko-ai/midnight",
+   "licence": "MIT",
+   "commercial_use": true,
+   "gated": false,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "openmidnight",
+   "name": "OpenMidnight",
+   "developer": "Sophont AI",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "openmidnight",
+   "embed_dim": 1536,
+   "patch_size": 224,
+   "mag": 20,
+   "hf_repo": "SophontAI/OpenMidnight",
+   "link": "https://huggingface.co/SophontAI/OpenMidnight",
+   "licence": "Apache-2.0",
+   "commercial_use": true,
+   "gated": true,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "gpfm",
+   "name": "GPFM",
+   "developer": "HKUST (majiabo)",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "gpfm",
+   "embed_dim": 1024,
+   "patch_size": 224,
+   "mag": 20,
+   "hf_repo": "majiabo/GPFM",
+   "link": "https://huggingface.co/majiabo/GPFM",
+   "licence": "MIT",
+   "commercial_use": true,
+   "gated": false,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "genbio-pathfm",
+   "name": "GenBio-PathFM",
+   "developer": "GenBio AI",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "genbio-pathfm",
+   "embed_dim": 4608,
+   "patch_size": 224,
+   "mag": 20,
+   "hf_repo": "genbio-ai/genbio-pathfm",
+   "link": "https://huggingface.co/genbio-ai/genbio-pathfm",
+   "licence": "GenBio AI Community",
+   "commercial_use": false,
+   "gated": false,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "hibou_l",
+   "name": "Hibou-L",
+   "developer": "HistAI",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "hibou_l",
+   "embed_dim": 1024,
+   "patch_size": 224,
+   "mag": 20,
+   "hf_repo": "histai/hibou-L",
+   "link": "https://huggingface.co/histai/hibou-L",
+   "licence": "Apache-2.0",
+   "commercial_use": true,
+   "gated": true,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "phaet",
+   "name": "Phaet",
+   "developer": "Waiv",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "phaet",
+   "embed_dim": 1024,
+   "patch_size": 224,
+   "mag": 20,
+   "hf_repo": "wearewaiv/phaet",
+   "link": "https://huggingface.co/wearewaiv/phaet",
+   "licence": "Waiv non-commercial",
+   "commercial_use": false,
+   "gated": true,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "mascaret",
+   "name": "Mascaret",
+   "developer": "Waiv",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "mascaret",
+   "embed_dim": "1536 / 3072",
+   "patch_size": 224,
+   "mag": 20,
+   "hf_repo": "wearewaiv/mascaret",
+   "link": "https://huggingface.co/wearewaiv/mascaret",
+   "licence": "Waiv non-commercial",
+   "commercial_use": false,
+   "gated": true,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "lunit-vits8",
+   "name": "Lunit DINO ViT-S/8",
+   "developer": "Lunit",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "lunit-vits8",
+   "embed_dim": 384,
+   "patch_size": 224,
+   "mag": 20,
+   "hf_repo": "1aurent/vit_small_patch8_224.lunit_dino",
+   "link": "https://huggingface.co/1aurent/vit_small_patch8_224.lunit_dino",
+   "licence": "Lunit non-commercial",
+   "commercial_use": false,
+   "gated": false,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "kaiko-vits8",
+   "name": "Kaiko ViT-S/8",
+   "developer": "Kaiko",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "kaiko-vits8",
+   "embed_dim": 384,
+   "patch_size": 256,
+   "mag": 20,
+   "hf_repo": null,
+   "link": "https://huggingface.co/collections/1aurent/kaikoai-models-66636c99d8e1e34bc6dcf795",
+   "licence": "Kaiko non-commercial",
+   "commercial_use": false,
+   "gated": false,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": "TRIDENT lists 384/768/1024-d for the S/B/L variants; per-variant dim assigned by ViT width."
+  },
+  {
+   "id": "kaiko-vits16",
+   "name": "Kaiko ViT-S/16",
+   "developer": "Kaiko",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "kaiko-vits16",
+   "embed_dim": 384,
+   "patch_size": 256,
+   "mag": 20,
+   "hf_repo": null,
+   "link": "https://huggingface.co/collections/1aurent/kaikoai-models-66636c99d8e1e34bc6dcf795",
+   "licence": "Kaiko non-commercial",
+   "commercial_use": false,
+   "gated": false,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": "TRIDENT lists 384/768/1024-d for the S/B/L variants; per-variant dim assigned by ViT width."
+  },
+  {
+   "id": "kaiko-vitb8",
+   "name": "Kaiko ViT-B/8",
+   "developer": "Kaiko",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "kaiko-vitb8",
+   "embed_dim": 768,
+   "patch_size": 256,
+   "mag": 20,
+   "hf_repo": null,
+   "link": "https://huggingface.co/collections/1aurent/kaikoai-models-66636c99d8e1e34bc6dcf795",
+   "licence": "Kaiko non-commercial",
+   "commercial_use": false,
+   "gated": false,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": "TRIDENT lists 384/768/1024-d for the S/B/L variants; per-variant dim assigned by ViT width."
+  },
+  {
+   "id": "kaiko-vitb16",
+   "name": "Kaiko ViT-B/16",
+   "developer": "Kaiko",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "kaiko-vitb16",
+   "embed_dim": 768,
+   "patch_size": 256,
+   "mag": 20,
+   "hf_repo": null,
+   "link": "https://huggingface.co/collections/1aurent/kaikoai-models-66636c99d8e1e34bc6dcf795",
+   "licence": "Kaiko non-commercial",
+   "commercial_use": false,
+   "gated": false,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": "TRIDENT lists 384/768/1024-d for the S/B/L variants; per-variant dim assigned by ViT width."
+  },
+  {
+   "id": "kaiko-vitl14",
+   "name": "Kaiko ViT-L/14",
+   "developer": "Kaiko",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "kaiko-vitl14",
+   "embed_dim": 1024,
+   "patch_size": 256,
+   "mag": 20,
+   "hf_repo": null,
+   "link": "https://huggingface.co/collections/1aurent/kaikoai-models-66636c99d8e1e34bc6dcf795",
+   "licence": "Kaiko non-commercial",
+   "commercial_use": false,
+   "gated": false,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": "TRIDENT lists 384/768/1024-d for the S/B/L variants; per-variant dim assigned by ViT width."
+  },
+  {
+   "id": "ctranspath",
+   "name": "CTransPath (CHIEF weights)",
+   "developer": "Wang et al.",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "ctranspath",
+   "embed_dim": 768,
+   "patch_size": 256,
+   "mag": 10,
+   "hf_repo": null,
+   "link": "https://github.com/hms-dbmi/CHIEF",
+   "licence": "GPL-3.0",
+   "commercial_use": false,
+   "gated": false,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": "Runs at 10x. Patch encoder for the CHIEF slide encoder."
+  },
+  {
+   "id": "resnet50",
+   "name": "ResNet-50 (ImageNet)",
+   "developer": "Baseline",
+   "category": "patch",
+   "runner": "trident_patch",
+   "trident_name": "resnet50",
+   "embed_dim": 1024,
+   "patch_size": 256,
+   "mag": 20,
+   "hf_repo": null,
+   "link": "https://github.com/huggingface/pytorch-image-models",
+   "licence": "BSD-3-Clause",
+   "commercial_use": true,
+   "gated": false,
+   "tasks": [
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T",
+   "notes": "Not a pathology model — natural-image baseline for comparisons."
+  },
+  {
+   "id": "conch_v1",
+   "name": "CONCH",
+   "developer": "Mahmood Lab",
+   "category": "vl",
+   "runner": "trident_patch",
+   "trident_name": "conch_v1",
+   "embed_dim": 512,
+   "patch_size": 512,
+   "mag": 20,
+   "hf_repo": "MahmoodLab/CONCH",
+   "link": "https://huggingface.co/MahmoodLab/CONCH",
+   "licence": "CC-BY-NC-ND-4.0",
+   "commercial_use": false,
+   "gated": true,
+   "tasks": [
+    "zeroshot_tiles",
+    "zeroshot_wsi",
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T+GH",
+   "notes": "Zero-shot uses projected, L2-normalised image and text embeddings scaled by the model's logit_scale (CONCH starter notebook).",
+   "zeroshot_adapter": "conch"
+  },
+  {
+   "id": "musk",
+   "name": "MUSK",
+   "developer": "Stanford (Li lab)",
+   "category": "vl",
+   "runner": "trident_patch",
+   "trident_name": "musk",
+   "embed_dim": 1024,
+   "patch_size": 384,
+   "mag": 20,
+   "hf_repo": "xiangjx/musk",
+   "link": "https://huggingface.co/xiangjx/musk",
+   "licence": "CC-BY-NC-ND-4.0",
+   "commercial_use": false,
+   "gated": true,
+   "tasks": [
+    "zeroshot_tiles",
+    "zeroshot_wsi",
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T+GH",
+   "notes": "Zero-shot uses with_head=True, out_norm=True, ms_aug=False (MUSK README). Logit scale not documented: portal uses 100.",
+   "zeroshot_adapter": "musk"
+  },
+  {
+   "id": "keep",
+   "name": "KEEP",
+   "developer": "SJTU / Shanghai AI Lab",
+   "category": "vl",
+   "runner": "trident_patch",
+   "trident_name": "keep",
+   "embed_dim": 768,
+   "patch_size": 256,
+   "mag": 20,
+   "hf_repo": "Astaxanthin/KEEP",
+   "link": "https://huggingface.co/Astaxanthin/KEEP",
+   "licence": "MIT",
+   "commercial_use": true,
+   "gated": false,
+   "tasks": [
+    "zeroshot_tiles",
+    "zeroshot_wsi",
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "source": "T+HF",
+   "notes": "Knowledge-enhanced VLM (ViT-L/16 + BERT). Logit scale not documented: portal uses 100.",
+   "zeroshot_adapter": "keep"
+  },
+  {
+   "id": "plip",
+   "name": "PLIP",
+   "developer": "Huang et al. (Stanford)",
+   "category": "vl",
+   "runner": "custom_vl",
+   "trident_name": null,
+   "embed_dim": 512,
+   "patch_size": 224,
+   "mag": 20,
+   "hf_repo": "vinid/plip",
+   "link": "https://huggingface.co/vinid/plip",
+   "licence": "Not stated on model card",
+   "commercial_use": false,
+   "gated": false,
+   "tasks": [
+    "zeroshot_tiles",
+    "zeroshot_wsi",
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "zeroshot_adapter": "plip",
+   "source": "HF+GH",
+   "notes": "CLIP model loaded with transformers CLIPModel. Patch size/mag for slides are portal defaults, not from the model card."
+  },
+  {
+   "id": "quiltnet_b32",
+   "name": "QuiltNet-B-32",
+   "developer": "Univ. of Washington",
+   "category": "vl",
+   "runner": "custom_vl",
+   "trident_name": null,
+   "embed_dim": 512,
+   "patch_size": 224,
+   "mag": 20,
+   "hf_repo": "wisdomik/QuiltNet-B-32",
+   "link": "https://huggingface.co/wisdomik/QuiltNet-B-32",
+   "licence": "MIT",
+   "commercial_use": true,
+   "gated": false,
+   "tasks": [
+    "zeroshot_tiles",
+    "zeroshot_wsi",
+    "embed_tiles",
+    "embed_wsi"
+   ],
+   "zeroshot_adapter": "quiltnet",
+   "source": "HF",
+   "notes": "CLIP ViT-B/32 via open_clip hf-hub. Patch size/mag for slides are portal defaults, not from the model card."
+  },
+  {
+   "id": "slide:titan",
+   "name": "TITAN",
+   "developer": "Mahmood Lab",
+   "category": "slide",
+   "runner": "trident_slide",
+   "trident_name": "titan",
+   "patch_encoder": "conch_v15",
+   "embed_dim": null,
+   "patch_size": 512,
+   "mag": 20,
+   "hf_repo": "MahmoodLab/TITAN",
+   "link": "https://huggingface.co/MahmoodLab/TITAN",
+   "licence": "CC-BY-NC-ND-4.0",
+   "commercial_use": false,
+   "gated": true,
+   "tasks": [
+    "slide_embed",
+    "slide_zeroshot"
+   ],
+   "source": "T",
+   "notes": "Zero-shot follows the TITAN demo: encode_slide_from_patch_features → zero_shot_classifier(prompts, TEMPLATES) → zero_shot."
+  },
+  {
+   "id": "slide:prism",
+   "name": "PRISM",
+   "developer": "Paige",
+   "category": "slide",
+   "runner": "trident_slide",
+   "trident_name": "prism",
+   "patch_encoder": "virchow",
+   "embed_dim": null,
+   "patch_size": 224,
+   "mag": 20,
+   "hf_repo": "paige-ai/Prism",
+   "link": "https://huggingface.co/paige-ai/Prism",
+   "licence": "CC-BY-NC-ND-4.0",
+   "commercial_use": false,
+   "gated": true,
+   "tasks": [
+    "slide_embed"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "slide:prism2",
+   "name": "PRISM2",
+   "developer": "Paige",
+   "category": "slide",
+   "runner": "trident_slide",
+   "trident_name": "prism2",
+   "patch_encoder": "virchow2-cls",
+   "embed_dim": null,
+   "patch_size": 224,
+   "mag": 20,
+   "hf_repo": "paige-ai/Prism2",
+   "link": "https://huggingface.co/paige-ai/Prism2",
+   "licence": "CC-BY-NC-ND-4.0",
+   "commercial_use": false,
+   "gated": true,
+   "tasks": [
+    "slide_embed"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "slide:chief",
+   "name": "CHIEF",
+   "developer": "Harvard (Yu lab)",
+   "category": "slide",
+   "runner": "trident_slide",
+   "trident_name": "chief",
+   "patch_encoder": "ctranspath",
+   "embed_dim": null,
+   "patch_size": 256,
+   "mag": 10,
+   "hf_repo": null,
+   "link": "https://github.com/hms-dbmi/CHIEF",
+   "licence": "AGPL-3.0",
+   "commercial_use": false,
+   "gated": false,
+   "tasks": [
+    "slide_embed"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "slide:gigapath",
+   "name": "Prov-GigaPath (slide)",
+   "developer": "Providence / Microsoft",
+   "category": "slide",
+   "runner": "trident_slide",
+   "trident_name": "gigapath",
+   "patch_encoder": "gigapath",
+   "embed_dim": null,
+   "patch_size": 256,
+   "mag": 20,
+   "hf_repo": "prov-gigapath/prov-gigapath",
+   "link": "https://huggingface.co/prov-gigapath/prov-gigapath",
+   "licence": "Apache-2.0",
+   "commercial_use": true,
+   "gated": true,
+   "tasks": [
+    "slide_embed"
+   ],
+   "source": "T",
+   "notes": "LongNet slide encoder over GigaPath tile embeddings."
+  },
+  {
+   "id": "slide:gigapath-flash",
+   "name": "Prov-GigaPath-Flash (slide)",
+   "developer": "Providence / Microsoft",
+   "category": "slide",
+   "runner": "trident_slide",
+   "trident_name": "gigapath-flash",
+   "patch_encoder": "gigapath-flash",
+   "embed_dim": null,
+   "patch_size": 256,
+   "mag": 20,
+   "hf_repo": "prov-gigapath/prov-gigapath-flash",
+   "link": "https://huggingface.co/prov-gigapath/prov-gigapath-flash",
+   "licence": "Apache-2.0",
+   "commercial_use": true,
+   "gated": true,
+   "tasks": [
+    "slide_embed"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "slide:madeleine",
+   "name": "MADELEINE",
+   "developer": "Mahmood Lab",
+   "category": "slide",
+   "runner": "trident_slide",
+   "trident_name": "madeleine",
+   "patch_encoder": "conch_v1",
+   "embed_dim": null,
+   "patch_size": 256,
+   "mag": 10,
+   "hf_repo": "MahmoodLab/madeleine",
+   "link": "https://huggingface.co/MahmoodLab/madeleine",
+   "licence": "MIT",
+   "commercial_use": true,
+   "gated": true,
+   "tasks": [
+    "slide_embed"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "slide:feather",
+   "name": "FEATHER (CONCH v1.5)",
+   "developer": "Mahmood Lab",
+   "category": "slide",
+   "runner": "trident_slide",
+   "trident_name": "feather",
+   "patch_encoder": "conch_v15",
+   "embed_dim": null,
+   "patch_size": 512,
+   "mag": 20,
+   "hf_repo": "MahmoodLab/abmil.base.conch_v15.pc108-24k",
+   "link": "https://huggingface.co/MahmoodLab/abmil.base.conch_v15.pc108-24k",
+   "licence": "CC-BY-NC-ND-4.0",
+   "commercial_use": false,
+   "gated": true,
+   "tasks": [
+    "slide_embed"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "slide:feather_uni_v2",
+   "name": "FEATHER (UNI2-h)",
+   "developer": "Mahmood Lab",
+   "category": "slide",
+   "runner": "trident_slide",
+   "trident_name": "feather_uni_v2",
+   "patch_encoder": "uni_v2",
+   "embed_dim": null,
+   "patch_size": 256,
+   "mag": 20,
+   "hf_repo": "MahmoodLab/abmil.base.uni_v2.pc108-24k",
+   "link": "https://huggingface.co/MahmoodLab/abmil.base.uni_v2.pc108-24k",
+   "licence": "CC-BY-NC-ND-4.0",
+   "commercial_use": false,
+   "gated": true,
+   "tasks": [
+    "slide_embed"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "slide:care",
+   "name": "CARE",
+   "developer": "Zipper-1",
+   "category": "slide",
+   "runner": "trident_slide",
+   "trident_name": "care",
+   "patch_encoder": "conch_v15",
+   "embed_dim": null,
+   "patch_size": 512,
+   "mag": 20,
+   "hf_repo": "Zipper-1/CARE",
+   "link": "https://huggingface.co/Zipper-1/CARE",
+   "licence": "CC-BY-NC-4.0",
+   "commercial_use": false,
+   "gated": true,
+   "tasks": [
+    "slide_embed"
+   ],
+   "source": "T",
+   "notes": null
+  },
+  {
+   "id": "gigatime",
+   "name": "GigaTIME",
+   "developer": "Providence / Microsoft",
+   "category": "vmif",
+   "runner": "gigatime",
+   "trident_name": null,
+   "embed_dim": null,
+   "patch_size": 512,
+   "mag": 20,
+   "hf_repo": "prov-gigatime/GigaTIME",
+   "link": "https://huggingface.co/prov-gigatime/GigaTIME",
+   "licence": "Apache-2.0 (GitHub); HF terms must be accepted",
+   "commercial_use": false,
+   "gated": true,
+   "tasks": [
+    "vmif_tiles",
+    "vmif_wsi"
+   ],
+   "channels": [
+    "DAPI",
+    "TRITC",
+    "Cy5",
+    "PD-1",
+    "CD14",
+    "CD4",
+    "T-bet",
+    "CD34",
+    "CD68",
+    "CD16",
+    "CD11c",
+    "CD138",
+    "CD20",
+    "CD3",
+    "CD8",
+    "PD-L1",
+    "CK",
+    "Ki67",
+    "Tryptase",
+    "Actin-D",
+    "Caspase3-D",
+    "PHH3-B",
+    "Transgelin"
+   ],
+   "background_channels": [
+    "TRITC",
+    "Cy5"
+   ],
+   "source": "GH+HF",
+   "notes": "23-channel virtual mIF. Channel order from the official gigatime_testing notebook; ImageNet mean/std from the HF config; 512 px input run as 256 px windows; sigmoid applied to logits. TRITC and Cy5 are background channels. 20x is the portal default."
+  },
+  {
+   "id": "gigatime-flash",
+   "name": "GigaTIME-Flash",
+   "developer": "Providence / Microsoft",
+   "category": "vmif",
+   "runner": null,
+   "trident_name": null,
+   "embed_dim": null,
+   "patch_size": 512,
+   "mag": 20,
+   "hf_repo": "prov-gigatime/GigaTIME-flash",
+   "link": "https://huggingface.co/prov-gigatime/GigaTIME-flash",
+   "licence": "Apache-2.0 (GitHub)",
+   "commercial_use": false,
+   "gated": true,
+   "tasks": [],
+   "channels": [
+    "DAPI",
+    "TRITC",
+    "Cy5",
+    "PD-1",
+    "CD14",
+    "CD4",
+    "T-bet",
+    "CD34",
+    "CD68",
+    "CD16",
+    "CD11c",
+    "CD138",
+    "CD20",
+    "CD3",
+    "CD8",
+    "PD-L1",
+    "CK",
+    "Ki67",
+    "Tryptase",
+    "Actin-D",
+    "Caspase3-D",
+    "PHH3-B",
+    "Transgelin"
+   ],
+   "source": "GH",
+   "notes": "Listed only. The GigaTIMEFlash class is defined inside a notebook, not an importable module, so the portal has no runner yet."
+  },
+  {
+   "id": "hex_nolan48",
+   "name": "HEX (nolan48)",
+   "developer": "Stanford (Li lab)",
+   "category": "vmif",
+   "runner": "hex",
+   "trident_name": null,
+   "embed_dim": null,
+   "patch_size": null,
+   "mag": null,
+   "hf_repo": "zli1893/hex_nolan48",
+   "link": "https://huggingface.co/zli1893/hex_nolan48",
+   "licence": "CC-BY-NC-ND-4.0",
+   "commercial_use": false,
+   "gated": false,
+   "tasks": [
+    "vmif_tiles",
+    "vmif_wsi"
+   ],
+   "channels": [
+    "DAPI",
+    "FOXP3",
+    "CDX2",
+    "CD8",
+    "p53",
+    "GATA3",
+    "CD45",
+    "HLA-DR",
+    "PD-L1",
+    "Ki67",
+    "CD45RA",
+    "CD4",
+    "CD21",
+    "MUC1",
+    "CD30",
+    "CD2",
+    "Vimentin",
+    "CD20",
+    "Na-K-ATPase",
+    "CD5",
+    "IDO1",
+    "PanCK",
+    "CD56",
+    "aSMA",
+    "BCL2",
+    "CD25",
+    "Collagen IV",
+    "CD11c",
+    "PD-1",
+    "Granzyme B",
+    "EGFR",
+    "VISTA",
+    "CD15",
+    "CD194",
+    "MMP9",
+    "Synaptophysin",
+    "CD7",
+    "CD3",
+    "Chromogranin A",
+    "CD163",
+    "CD57",
+    "CD45RO",
+    "CD68",
+    "CD31",
+    "Podoplanin",
+    "CD34",
+    "CD38",
+    "CD138"
+   ],
+   "requires": [
+    "xiangjx/musk (gated)"
+   ],
+   "source": "HF+GH",
+   "notes": "48-marker virtual CODEX on a MUSK backbone. Patches resized to 384 px with Inception mean/std (infer_slide_h5_nolan48.py). Slide patches use a 56 µm footprint by default — adjustable."
+  },
+  {
+   "id": "stpath",
+   "name": "STPath",
+   "developer": "Huang et al. (Yale / Broad)",
+   "category": "st",
+   "runner": "stpath",
+   "trident_name": null,
+   "embed_dim": null,
+   "patch_size": null,
+   "mag": null,
+   "hf_repo": "tlhuang/STPath",
+   "link": "https://huggingface.co/tlhuang/STPath",
+   "licence": "Not stated on model card",
+   "commercial_use": false,
+   "gated": false,
+   "tasks": [
+    "st_wsi"
+   ],
+   "requires": [
+    "prov-gigapath/prov-gigapath (gated)"
+   ],
+   "source": "HF",
+   "notes": "Generative spatial-transcriptomics model over GigaPath spot embeddings. Outputs log1p expression per spot."
+  },
+  {
+   "id": "seg:hest",
+   "name": "HEST tissue segmenter",
+   "developer": "Mahmood Lab",
+   "category": "seg",
+   "runner": "trident_seg",
+   "trident_name": "hest",
+   "hf_repo": "MahmoodLab/hest-tissue-seg",
+   "link": "https://huggingface.co/MahmoodLab/hest-tissue-seg",
+   "licence": "CC-BY-NC-SA-4.0",
+   "commercial_use": false,
+   "gated": false,
+   "tasks": [
+    "segment_wsi"
+   ],
+   "source": "T",
+   "notes": "TRIDENT default. Better on IHC and dirtier slides.",
+   "embed_dim": null,
+   "patch_size": null,
+   "mag": null
+  },
+  {
+   "id": "seg:grandqc",
+   "name": "GrandQC tissue segmenter",
+   "developer": "Univ. Cologne",
+   "category": "seg",
+   "runner": "trident_seg",
+   "trident_name": "grandqc",
+   "hf_repo": null,
+   "link": "https://github.com/cpath-ukk/grandqc",
+   "licence": "CC-BY-NC-SA-4.0",
+   "commercial_use": false,
+   "gated": false,
+   "tasks": [
+    "segment_wsi"
+   ],
+   "source": "T",
+   "notes": "Fast, accurate on clean H&E. Citation requested.",
+   "embed_dim": null,
+   "patch_size": null,
+   "mag": null
+  },
+  {
+   "id": "seg:otsu",
+   "name": "Otsu threshold",
+   "developer": "Classical",
+   "category": "seg",
+   "runner": "trident_seg",
+   "trident_name": "otsu",
+   "hf_repo": null,
+   "link": null,
+   "licence": "No weights",
+   "commercial_use": true,
+   "gated": false,
+   "tasks": [
+    "segment_wsi"
+   ],
+   "source": "T",
+   "notes": "CPU-only fallback; no model weights.",
+   "embed_dim": null,
+   "patch_size": null,
+   "mag": null
+  }
+ ]
+}
