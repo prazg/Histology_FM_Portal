@@ -8,30 +8,29 @@ import sys
 import numpy as np
 from PIL import Image
 
-from .common import batched, load_tiles, prepare_slide, read_patches, save_thumbs, to_png
+from .common import batched, cached_model, load_tiles, prepare_slide, read_patches, save_thumbs, to_png
 
 MEAN = np.array([0.485, 0.456, 0.406], np.float32)
 STD = np.array([0.229, 0.224, 0.225], np.float32)
 IN_PX, WIN = 512, 256
-_model = {}
 
 
 def _load(ctx):
-    if "m" in _model:
-        return _model["m"]
-    import torch
-    from huggingface_hub import snapshot_download
-    repo = ctx.settings.gigatime_repo
-    if not repo or not (repo / "scripts" / "archs.py").exists():
-        raise RuntimeError("Set gigatime_repo in backend/config.yaml to a clone of github.com/prov-gigatime/GigaTIME")
-    sys.path.insert(0, str(repo / "scripts"))
-    import archs
-    ctx.progress(0.03, "Downloading/loading GigaTIME weights (prov-gigatime/GigaTIME)")
-    model = archs.gigatime(num_classes=23, input_channels=3)
-    sd = torch.load(f"{snapshot_download(repo_id='prov-gigatime/GigaTIME')}/model.pth", map_location="cpu")
-    model.load_state_dict(sd)
-    _model["m"] = model.eval().to(ctx.device)
-    return _model["m"]
+    def _build():
+        import torch
+        from huggingface_hub import snapshot_download
+        repo = ctx.settings.gigatime_repo
+        if not repo or not (repo / "scripts" / "archs.py").exists():
+            raise RuntimeError("Set gigatime_repo in backend/config.yaml to a clone of github.com/prov-gigatime/GigaTIME")
+        sys.path.insert(0, str(repo / "scripts"))
+        import archs
+        ctx.progress(0.03, "Downloading/loading GigaTIME weights (prov-gigatime/GigaTIME)")
+        model = archs.gigatime(num_classes=23, input_channels=3)
+        sd = torch.load(f"{snapshot_download(repo_id='prov-gigatime/GigaTIME')}/model.pth", map_location="cpu")
+        model.load_state_dict(sd)
+        return model.eval().to(ctx.device)
+
+    return cached_model(("gigatime", ctx.device), _build)
 
 
 def _mock_probs(imgs, n_ch):

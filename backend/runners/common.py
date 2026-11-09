@@ -269,7 +269,7 @@ def read_patches(sp: SlidePrep, idx: Sequence[int], out_px: int) -> List[Image.I
 
 def slide_features(ctx, sp: SlidePrep, encoder, enc_name: str, mock_dim: int, out_px: int,
                    mock_encoder: Optional[Callable] = None) -> Tuple[np.ndarray, Optional[str]]:
-    """Patch features for every coordinate. Real mode: TRIDENT extract_patch_features → h5."""
+    """Patch features for every coordinate. Real mode: TRIDENT extract_patch_features → h5 (with cross-job caching)."""
     if ctx.mock:
         enc = mock_encoder or MockImageEncoder(enc_name, mock_dim)
         feats = []
@@ -278,16 +278,37 @@ def slide_features(ctx, sp: SlidePrep, encoder, enc_name: str, mock_dim: int, ou
             feats.append(enc(read_patches(sp, chunk, out_px)))
             ctx.progress(0.2 + 0.6 * (i + len(chunk)) / n)
         return np.concatenate(feats), None
+    import h5py
+    wsi_p = Path(ctx.inputs["wsi"]).resolve()
+    mtime = wsi_p.stat().st_mtime_ns if wsi_p.exists() else 0
+    coords_hash = hashlib.sha1(np.ascontiguousarray(sp.coords).tobytes()).hexdigest()[:12]
+    cache_key = hashlib.sha1(f"{wsi_p}:{mtime}:{enc_name}:{sp.patch0:.1f}:{coords_hash}".encode()).hexdigest()[:16]
+    cache_dir = ctx.settings.work_dir / "cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cached_h5 = cache_dir / f"{enc_name}_{cache_key}.h5"
+    if cached_h5.is_file():
+        try:
+            with h5py.File(cached_h5, "r") as f:
+                feats = f["features"][:]
+                coords = f["coords"][:]
+            if len(coords) == len(sp.coords):
+                ctx.progress(0.75, f"Reusing cached {enc_name} features ({len(feats)} patches)")
+                return np.asarray(feats, dtype=np.float32), str(cached_h5)
+        except Exception:
+            pass
     ctx.progress(0.25, f"Extracting {enc_name} features for {len(sp.coords)} patches")
     path = sp.slide.extract_patch_features(patch_encoder=encoder, coords_path=sp.coords_path,
                                            save_features=str(ctx.scratch / f"features_{enc_name}"),
                                            device=ctx.device, batch_limit=int(ctx.params.get("batch_size", 256)))
-    import h5py
     with h5py.File(path, "r") as f:
         feats = f["features"][:]
         coords = f["coords"][:]
     if len(coords) != len(sp.coords) or not np.array_equal(coords, sp.coords):
         sp.coords = coords
+    try:
+        cached_h5.write_bytes(Path(path).read_bytes())
+    except Exception:
+        pass
     return np.asarray(feats, dtype=np.float32), path
 
 
@@ -298,3 +319,52 @@ def autocast(ctx, dtype):
     if dev != "cuda" or dtype == torch.float32:
         return contextlib.nullcontext()
     return torch.autocast(device_type="cuda", dtype=dtype)
+
+
+# ── unified GPU model cache ───────────────────────────────────────────────────
+
+_ACTIVE_MODEL: dict = {"key": None, "obj": None}
+
+
+def cached_model(key, loader):
+    """Keep at most one heavy model resident in GPU memory across all runners."""
+    if _ACTIVE_MODEL["key"] == key and _ACTIVE_MODEL["obj"] is not None:
+        return _ACTIVE_MODEL["obj"]
+    clear_model_cache()
+    obj = loader()
+    _ACTIVE_MODEL["key"] = key
+    _ACTIVE_MODEL["obj"] = obj
+    return obj
+
+
+def clear_model_cache() -> Optional[str]:
+    """Unload any cached model and free CUDA memory. Returns the unloaded key."""
+    import gc
+    old_key = _ACTIVE_MODEL["key"]
+    obj = _ACTIVE_MODEL["obj"]
+    _ACTIVE_MODEL["key"] = None
+    _ACTIVE_MODEL["obj"] = None
+    if obj is not None:
+        try:
+            if hasattr(obj, "cpu"):
+                obj.cpu()
+            elif hasattr(obj, "model") and hasattr(obj.model, "cpu"):
+                obj.model.cpu()
+            elif hasattr(obj, "enc") and hasattr(obj.enc, "cpu"):
+                obj.enc.cpu()
+        except Exception:
+            pass
+        del obj
+    gc.collect()
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except ImportError:
+        pass
+    return str(old_key) if old_key else None
+
+
+def active_model_key() -> Optional[str]:
+    return str(_ACTIVE_MODEL["key"]) if _ACTIVE_MODEL["key"] else None
+

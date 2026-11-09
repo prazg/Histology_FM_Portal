@@ -94,8 +94,13 @@
               <button type="button" data-src="path" aria-pressed="true">Path on server</button>
               <button type="button" data-src="upload" aria-pressed="false">Upload</button>
             </div>
-            <div class="field" id="wsiPathField"><label for="wsiPath">Slide path on the backend machine</label>
+            <div class="field" id="wsiPathField">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
+                <label for="wsiPath">Slide path on the backend machine</label>
+                <button type="button" class="btn ghost small" id="browseWsiBtn" hidden>Browse server slides</button>
+              </div>
               <input type="text" id="wsiPath" placeholder="/data/wsi/TCGA-GBM/TCGA-06-0125-01Z-00-DX1.svs">
+              <select id="wsiBrowserSelect" hidden aria-label="Available server slides" style="margin-top:4px"></select>
               <span class="hint">Must sit inside a folder listed in <code>allowed_wsi_roots</code>. Best for multi-GB slides.</span></div>
             <div class="field" id="wsiUploadField" hidden><label for="wsiFile">Slide file</label>
               <input type="file" id="wsiFile" accept=".svs,.ndpi,.tif,.tiff,.mrxs,.scn,.czi,.png,.jpg,.jpeg">

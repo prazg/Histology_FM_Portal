@@ -68,6 +68,12 @@ def check_result(job):
         if p["type"] == "spatial":
             v = client.get(f"/api/jobs/{job['id']}/spatial/{p['id']}/0").json()
             assert len(v["values"]) == len(p["coords"])
+            gj = [f["name"] for f in res["files"] if f["name"] == f"qupath_{p['id']}.geojson"]
+            assert gj, "Expected QuPath GeoJSON export for spatial panel"
+            if p["coords"]:
+                x0, y0 = p["coords"][0]
+                pr = client.get(f"/api/jobs/{job['id']}/patch?x={x0}&y={y0}&size={int(p['patch'])}")
+                assert pr.status_code == 200 and pr.headers["content-type"] == "image/jpeg"
         if p["type"] == "image":
             assert client.get(f"/api/jobs/{job['id']}/files/{p['src']}").status_code == 200
     for f in res["files"]:
@@ -104,6 +110,8 @@ def test_rejects_bad_requests():
     assert client.post("/api/jobs", data={"model_id": "uni_v1", "task": "embed_tiles"}).status_code == 400
     r = client.post("/api/jobs", data={"model_id": "uni_v1", "task": "embed_wsi", "wsi_path": "/etc/passwd"})
     assert r.status_code in (400, 403)
+    assert client.post("/api/cache/clear").json()["cleared"] is True
+    assert "slides" in client.get("/api/wsi/browse").json()
 
 
 if __name__ == "__main__":

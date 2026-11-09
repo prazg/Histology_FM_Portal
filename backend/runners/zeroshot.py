@@ -8,7 +8,7 @@ from typing import List, Tuple
 
 import numpy as np
 
-from .common import (MockImageEncoder, autocast, batched, l2n, load_tiles, mock_text, prepare_slide,
+from .common import (MockImageEncoder, autocast, batched, cached_model, l2n, load_tiles, mock_text, prepare_slide,
                      read_patches, save_thumbs, slide_features, softmax)
 
 DEFAULT_SCALE = 100.0  # used only where a model does not document its logit scale
@@ -228,18 +228,14 @@ class QuiltAdapter(Adapter):
 
 
 ADAPTERS = {"conch": ConchAdapter, "musk": MuskAdapter, "keep": KeepAdapter, "plip": PlipAdapter, "quiltnet": QuiltAdapter}
-_cache = {}
 
 
 def get_adapter(ctx) -> Adapter:
     m = ctx.model
     if ctx.mock:
         return MockAdapter(ctx, int(m.get("embed_dim") or 512))
-    key = (m["zeroshot_adapter"], ctx.device)
-    if key not in _cache:  # keep one VL model warm between jobs
-        _cache.clear()
-        _cache[key] = ADAPTERS[m["zeroshot_adapter"]](ctx)
-    ad = _cache[key]
+    key = ("vl", m["zeroshot_adapter"], ctx.device)
+    ad = cached_model(key, lambda: ADAPTERS[m["zeroshot_adapter"]](ctx))
     ad.ctx = ctx
     return ad
 

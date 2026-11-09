@@ -62,6 +62,18 @@ In the portal, open **Connect → My server**, enter `http://127.0.0.1:8000` and
 
 **Remote GPU (HPC node or cloud):** forward the port with `ssh -L 8000:127.0.0.1:8000 <gpu-node>` and keep the URL as `http://127.0.0.1:8000`. Alternatively, put the server behind an HTTPS tunnel. A page served over HTTPS (GitHub Pages) can call `http://127.0.0.1`, but not plain-HTTP remote hosts. Chromium may ask you once for permission to reach the local network. The server sends `Access-Control-Allow-Private-Network: true` for browsers that check that header.
 
+### 4. Run with Docker (optional)
+```bash
+PORTAL_KEY=your-secret-key HF_TOKEN=hf_... WSI_HOST_DIR=/path/to/wsis docker compose up --build
+```
+
+## Key features
+- **Interactive spatial WSI viewer**: scroll-to-zoom, drag-to-pan, `O(1)` spatial hash hover, and click-to-inspect level-0 patch crops.
+- **Universal QuPath GeoJSON export**: every spatial WSI run (patch clusters, zero-shot maps, virtual mIF, and STPath spots) exports a ready-to-import `qupath_<panel>.geojson` annotation file alongside `.h5` and `.csv` outputs.
+- **Cross-job feature & GPU caching**: extracted WSI patch features are cached in `work/cache/` so re-running zero-shot prompts or slide encoders on the same slide is near-instant; a unified GPU cache keeps at most one heavy model in VRAM with one-click **Unload GPU VRAM** in the UI.
+- **Persistent job history & cancellation**: completed jobs reload from `work/jobs/*/job.json` across server restarts, and running jobs can be cancelled mid-flight.
+- **Server-side WSI browser**: browse slides inside `allowed_wsi_roots` directly from the Run form without typing full paths.
+
 ## Security
 - **Always set `portal_key`** before the server can be reached by anything other than your own machine. Every API call requires the key.
 - `origins` limits which web pages can call the server. Set it to your Pages origin.

@@ -174,31 +174,75 @@
     chSel.value = p.default || 0;
     const modeSel = p.rgb ? h("select", { "aria-label": "Mode" }, h("option", { value: "ch", text: "Single channel" }), h("option", { value: "rgb", text: "PCA as RGB" })) : null;
     const op = h("input", { type: "range", min: 0, max: 100, value: 70, "aria-label": "Overlay opacity" });
+    const resetBtn = h("button", { type: "button", class: "btn ghost small", hidden: true }, "Reset zoom");
     tools.append(h("label", {}, "Show", chSel));
     if (modeSel) tools.append(h("label", {}, "Mode", modeSel));
-    tools.append(h("label", {}, "Opacity", op));
-    const viz = h("div", { class: "viz" });
-    const cv = h("canvas", { role: "img", "aria-label": p.title });
+    tools.append(h("label", {}, "Opacity", op), resetBtn, h("span", { class: "small muted", text: "Scroll to zoom · drag to pan · click patch to inspect" }));
+    const viz = h("div", { class: "viz", style: "overflow:hidden;border-radius:4px;background:var(--glass-2)" });
+    const cv = h("canvas", { role: "img", "aria-label": p.title, style: "cursor:grab;touch-action:none" });
     const legend = h("div");
+    const inspector = h("div", { class: "patch-inspector", hidden: true });
     viz.append(cv);
-    box.append(tools, viz, legend);
+    box.append(tools, viz, legend, inspector);
     const tip = tipFor(viz);
     const img = new Image();
     const cache = {};
-    let cur = null;
+    let cur = null, colours = null;
     const get = i => cache[i] || (cache[i] = ctx.channel(p.id, i));
 
-    async function draw() {
-      if (!img.complete || !img.naturalWidth) return;
+    // O(1) spatial hash grid for fast patch lookup on 10k+ patch WSIs
+    const step0 = Math.max(1, p.patch);
+    const gridMap = new Map();
+    p.coords.forEach((c, idx) => {
+      const gx = Math.floor(c[0] / step0), gy = Math.floor(c[1] / step0);
+      const key = `${gx},${gy}`;
+      const bucket = gridMap.get(key);
+      if (bucket) bucket.push(idx); else gridMap.set(key, [idx]);
+    });
+    function findPatch(x0, y0) {
+      const gx = Math.floor(x0 / step0), gy = Math.floor(y0 / step0);
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+        const b = gridMap.get(`${gx + dx},${gy + dy}`);
+        if (!b) continue;
+        for (let k = 0; k < b.length; k++) {
+          const i = b[k], c = p.coords[i];
+          if (x0 >= c[0] && x0 < c[0] + p.patch && y0 >= c[1] && y0 < c[1] + p.patch) return i;
+        }
+      }
+      return -1;
+    }
+
+    // Pan & zoom state in canvas pixels
+    let zoom = 1, panX = 0, panY = 0, dragging = false, dragMoved = false, startX = 0, startY = 0, selIdx = -1;
+
+    function paint() {
+      if (!img.complete || !img.naturalWidth || !colours) return;
       const W = img.naturalWidth, H = img.naturalHeight;
-      cv.width = W; cv.height = H; cv.style.maxWidth = "100%"; cv.style.maxHeight = "72vh";
+      if (cv.width !== W || cv.height !== H) {
+        cv.width = W; cv.height = H; cv.style.maxWidth = "100%"; cv.style.maxHeight = "72vh";
+      }
       const g = cv.getContext("2d");
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, W, H);
+      g.setTransform(zoom, 0, 0, zoom, panX, panY);
       g.drawImage(img, 0, 0);
       const alpha = op.value / 100;
       const sz = Math.max(1, p.patch * p.scale);
+      g.globalAlpha = alpha;
+      p.coords.forEach((c, k) => { g.fillStyle = colours[k]; g.fillRect(c[0] * p.scale, c[1] * p.scale, Math.ceil(sz), Math.ceil(sz)); });
+      g.globalAlpha = 1;
+      if (selIdx >= 0 && p.coords[selIdx]) {
+        const c = p.coords[selIdx];
+        g.strokeStyle = "#ffffff";
+        g.lineWidth = Math.max(1.5, 2.5 / zoom);
+        g.strokeRect(c[0] * p.scale, c[1] * p.scale, Math.ceil(sz), Math.ceil(sz));
+      }
+    }
+
+    async function draw() {
+      if (!img.complete || !img.naturalWidth) return;
       const isRgb = modeSel && modeSel.value === "rgb";
       chSel.disabled = !!isRgb;
-      let colours;
       if (isRgb) {
         const [r, gg, b] = await Promise.all(p.rgb.map(get));
         colours = r.values.map((_, k) => `rgb(${Math.round(r.values[k] * 255)},${Math.round(gg.values[k] * 255)},${Math.round(b.values[k] * 255)})`);
@@ -216,20 +260,80 @@
           legend.replaceChildren(colorbar(lo, hi, !!meta.fixed));
         }
       }
-      g.globalAlpha = alpha;
-      p.coords.forEach((c, k) => { g.fillStyle = colours[k]; g.fillRect(c[0] * p.scale, c[1] * p.scale, Math.ceil(sz), Math.ceil(sz)); });
-      g.globalAlpha = 1;
+      paint();
     }
-    cv.addEventListener("mousemove", ev => {
-      if (!cur || cur.kind === "rgb") return tip.hide();
+
+    function toSlideCoords(ev) {
       const r = cv.getBoundingClientRect(), k = cv.width / r.width;
-      const x = (ev.clientX - r.left) * k / p.scale, y = (ev.clientY - r.top) * k / p.scale;
-      const i = p.coords.findIndex(c => x >= c[0] && x < c[0] + p.patch && y >= c[1] && y < c[1] + p.patch);
+      const cx = (ev.clientX - r.left) * k, cy = (ev.clientY - r.top) * k;
+      return { cx, cy, x0: (cx - panX) / zoom / p.scale, y0: (cy - panY) / zoom / p.scale, r };
+    }
+
+    cv.addEventListener("wheel", ev => {
+      ev.preventDefault();
+      const { cx, cy } = toSlideCoords(ev);
+      const factor = ev.deltaY < 0 ? 1.25 : 0.8;
+      const next = Math.min(12, Math.max(1, zoom * factor));
+      if (next === 1) { panX = 0; panY = 0; }
+      else { panX = cx - (cx - panX) * (next / zoom); panY = cy - (cy - panY) * (next / zoom); }
+      zoom = next;
+      resetBtn.hidden = zoom <= 1.01;
+      paint();
+    }, { passive: false });
+
+    cv.addEventListener("pointerdown", ev => {
+      dragging = true; dragMoved = false; startX = ev.clientX; startY = ev.clientY;
+      cv.setPointerCapture(ev.pointerId);
+      cv.style.cursor = "grabbing";
+    });
+    cv.addEventListener("pointermove", ev => {
+      if (dragging) {
+        const dx = ev.clientX - startX, dy = ev.clientY - startY;
+        if (Math.hypot(dx, dy) > 3) dragMoved = true;
+        if (zoom > 1 && dragMoved) {
+          const r = cv.getBoundingClientRect(), k = cv.width / r.width;
+          panX += dx * k; panY += dy * k;
+          startX = ev.clientX; startY = ev.clientY;
+          paint();
+          return tip.hide();
+        }
+      }
+      if (!cur || cur.kind === "rgb") return tip.hide();
+      const { x0, y0, r } = toSlideCoords(ev);
+      const i = findPatch(x0, y0);
       if (i < 0) return tip.hide();
       const v = cur.d.values[i];
       tip.show(ev.clientX - r.left, ev.clientY - r.top, `${cur.meta.kind === "categorical" ? cur.meta.labels[Math.round(v)] : `${cur.meta.name}: ${fmt(v)}`}  ·  (${p.coords[i][0]}, ${p.coords[i][1]})`);
     });
-    cv.addEventListener("mouseleave", () => tip.hide());
+    cv.addEventListener("pointerup", async ev => {
+      dragging = false; cv.style.cursor = "grab";
+      if (dragMoved) return;
+      const { x0, y0 } = toSlideCoords(ev);
+      const i = findPatch(x0, y0);
+      if (i < 0) { selIdx = -1; inspector.hidden = true; paint(); return; }
+      selIdx = i; paint();
+      const [px, py] = p.coords[i];
+      const valText = cur && cur.kind !== "rgb"
+        ? (cur.meta.kind === "categorical" ? cur.meta.labels[Math.round(cur.d.values[i])] : `${cur.meta.name}: ${fmt(cur.d.values[i])}`)
+        : "RGB composite";
+      const cropImg = h("img", { alt: `Patch (${px}, ${py})`, style: "width:96px;height:96px;object-fit:cover;border-radius:4px;border:1px solid var(--line);background:var(--glass)" });
+      if (ctx.patch) cropImg.src = ctx.patch(px, py, Math.round(p.patch));
+      else {
+        const c2 = h("canvas", { width: 96, height: 96 });
+        c2.getContext("2d").drawImage(img, px * p.scale, py * p.scale, Math.max(4, p.patch * p.scale), Math.max(4, p.patch * p.scale), 0, 0, 96, 96);
+        cropImg.src = c2.toDataURL();
+      }
+      inspector.replaceChildren(
+        cropImg,
+        h("div", { style: "display:grid;gap:2px" },
+          h("strong", { text: `Patch #${i + 1} at (${px}, ${py})` }),
+          h("span", { class: "small muted", text: `Level-0 size: ${Math.round(p.patch)} px · ${valText}` })),
+        h("button", { type: "button", class: "btn ghost small", style: "margin-left:auto", onclick: () => { selIdx = -1; inspector.hidden = true; paint(); } }, "Close")
+      );
+      inspector.hidden = false;
+    });
+    cv.addEventListener("mouseleave", () => { dragging = false; tip.hide(); });
+    resetBtn.addEventListener("click", () => { zoom = 1; panX = 0; panY = 0; resetBtn.hidden = true; paint(); });
     [chSel, op].forEach(e => e.addEventListener("input", draw));
     modeSel && modeSel.addEventListener("change", draw);
     img.onload = draw;

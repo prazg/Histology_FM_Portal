@@ -237,6 +237,7 @@ details summary { cursor: pointer; color: var(--ink-2); padding: 4px 0; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .84rem; color: var(--ink-2); margin-top: 10px; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
+.patch-inspector { display: flex; align-items: center; gap: 14px; margin-top: 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--glass-2); }
 .cbar { height: 10px; width: 220px; border-radius: 2px; }
 .cbar-row { display: flex; align-items: center; gap: 8px; font-size: .8rem; color: var(--ink-3); margin-top: 10px; }
 .ch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }

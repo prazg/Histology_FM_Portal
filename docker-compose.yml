@@ -1,0 +1,20 @@
+services:
+  portal-backend:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      - PORTAL_MOCK=${PORTAL_MOCK:-0}
+      - PORTAL_KEY=${PORTAL_KEY:-change-me-to-a-long-random-string}
+      - PORTAL_ORIGINS=${PORTAL_ORIGINS:-*}
+      - HF_TOKEN=${HF_TOKEN:-}
+    volumes:
+      - ./backend/work:/data/work
+      - ${WSI_HOST_DIR:-./slides}:/data/wsi:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

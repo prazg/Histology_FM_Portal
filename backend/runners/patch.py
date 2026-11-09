@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .common import (MockImageEncoder, autocast, batched, kmeans, load_tiles, pca, prepare_slide,
+from .common import (MockImageEncoder, autocast, batched, cached_model, kmeans, load_tiles, pca, prepare_slide,
                      save_thumbs, slide_features, unit_rgb)
 
 CLUSTER_COLOURS = 12
@@ -15,11 +15,15 @@ def mock_dim(model) -> int:
 
 
 def load_encoder(ctx, name: str, **kw):
-    """TRIDENT patch encoder (handles HF download, transforms and precision)."""
-    from trident.patch_encoder_models import encoder_factory
-    ctx.progress(0.02, f"Loading {name} via TRIDENT encoder_factory")
-    enc = encoder_factory(name, **kw)
-    return enc.eval().to(ctx.device)
+    """TRIDENT patch encoder (handles HF download, transforms and precision), cached on GPU."""
+    key = ("trident_patch", name, ctx.device, tuple(sorted(kw.items())))
+
+    def _build():
+        from trident.patch_encoder_models import encoder_factory
+        ctx.progress(0.02, f"Loading {name} via TRIDENT encoder_factory")
+        return encoder_factory(name, **kw).eval().to(ctx.device)
+
+    return cached_model(key, _build)
 
 
 def encode_tiles(ctx, enc, imgs, bs: int = 64) -> np.ndarray:

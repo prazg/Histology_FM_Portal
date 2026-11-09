@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-backend-mock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install core backend & test dependencies
+        run: |
+          pip install fastapi "uvicorn[standard]" python-multipart numpy pillow pyyaml h5py httpx pytest
+      - name: Validate models.json registry schema
+        run: |
+          python -c "
+          import json
+          from pathlib import Path
+          reg = json.loads(Path('docs/models.json').read_text(encoding='utf-8'))
+          assert 'models' in reg and 'tasks' in reg and 'categories' in reg
+          ids = [m['id'] for m in reg['models']]
+          assert len(ids) == len(set(ids)), 'Duplicate model IDs in docs/models.json'
+          for m in reg['models']:
+              assert m['category'] in reg['categories'], m['id']
+              for t in m.get('tasks', []):
+                  assert t in reg['tasks'], (m['id'], t)
+          print(f'Verified {len(ids)} models in registry.')
+          "
+      - name: Run 95 model x task mock API tests
+        env:
+          PORTAL_MOCK: "1"
+        run: |
+          cd backend
+          python -m pytest -q tests/test_api_mock.py

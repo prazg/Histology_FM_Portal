@@ -42,6 +42,11 @@
     if (String(jobId).startsWith("demo")) return Demo.channel(jobId, pid, idx);
     return api(`/api/jobs/${jobId}/spatial/${pid}/${idx}`);
   };
+  const patchUrl = (jobId, x, y, size) => {
+    if (String(jobId).startsWith("demo")) return null;
+    const q = S.conn.key ? `&key=${encodeURIComponent(S.conn.key)}` : "";
+    return `${base()}/api/jobs/${jobId}/patch?x=${Math.round(x)}&y=${Math.round(y)}&size=${Math.round(size)}${q}`;
+  };
 
   // ── routing ──────────────────────────────────────────────────────────
   function route() {
@@ -326,6 +331,24 @@
     document.querySelectorAll("#wsiInput [data-src]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
     $("#wsiPathField").hidden = S.run.src !== "path"; $("#wsiUploadField").hidden = S.run.src !== "upload";
   }));
+  $("#browseWsiBtn")?.addEventListener("click", async () => {
+    const sel = $("#wsiBrowserSelect");
+    try {
+      const r = await api("/api/wsi/browse");
+      if (!r.slides || !r.slides.length) {
+        sel.replaceChildren(h("option", { value: "", text: "No slides found in allowed_wsi_roots" }));
+      } else {
+        sel.replaceChildren(
+          h("option", { value: "", text: `Choose from ${r.slides.length} slide(s) on server…` }),
+          ...r.slides.map(s => h("option", { value: s.path, text: `${s.name} (${s.size_mb} MB) — ${s.path}` }))
+        );
+      }
+      sel.hidden = false;
+    } catch (e) { alert(e.message); }
+  });
+  $("#wsiBrowserSelect")?.addEventListener("change", e => {
+    if (e.target.value) $("#wsiPath").value = e.target.value;
+  });
 
   $("#runForm").addEventListener("submit", async e => {
     e.preventDefault();
@@ -390,22 +413,26 @@
     if (key === shownKey) return;
     shownKey = key;
     const m = S.byId[j.model_id] || { name: j.model_id, category: "patch" };
+    const isRunning = j.status === "running" || j.status === "queued";
     const head = h("div", { class: "job-head" }, h("h2", { text: m.name }), h("span", { class: "muted", text: taskLabel(j.task) }),
       h("span", { class: "small muted", text: `Job ${j.id} · ${when(j.created)}` }),
-      !String(j.id).startsWith("demo") && j.status !== "running" ? h("button", { class: "btn ghost small", style: "margin-left:auto", onclick: async () => {
+      !String(j.id).startsWith("demo") && isRunning ? h("button", { class: "btn ghost small", style: "margin-left:auto", onclick: async () => {
+        await api(`/api/jobs/${j.id}/cancel`, { method: "POST" }); shownKey = ""; refreshJobs(); } }, "Cancel job") : null,
+      !String(j.id).startsWith("demo") && !isRunning ? h("button", { class: "btn ghost small", style: "margin-left:auto", onclick: async () => {
         await api(`/api/jobs/${j.id}`, { method: "DELETE" }); S.selJob = null; refreshJobs(); } }, "Delete job") : null);
     const kids = [head];
-    if (j.status === "queued" || j.status === "running") {
+    if (isRunning) {
       kids.push(h("div", { class: "progress", role: "progressbar", "aria-valuenow": Math.round(j.progress * 100), "aria-valuemin": 0, "aria-valuemax": 100 }, h("i", { style: `width:${Math.max(3, j.progress * 100)}%` })),
         h("p", { class: "muted", text: j.stage }), h("div", { class: "log", text: j.log.slice(-12).join("\n") }));
-    } else if (j.status === "error") {
-      kids.push(h("div", { class: "notice err" }, h("strong", { text: "The job failed. " }), j.error), h("details", { open: true }, h("summary", { text: "Server log" }), h("div", { class: "log", text: j.log.join("\n") })));
+    } else if (j.status === "error" || j.status === "cancelled") {
+      kids.push(h("div", { class: "notice " + (j.status === "cancelled" ? "" : "err") }, h("strong", { text: j.status === "cancelled" ? "Job cancelled. " : "The job failed. " }), j.error || ""),
+        h("details", { open: j.status === "error" }, h("summary", { text: "Server log" }), h("div", { class: "log", text: j.log.join("\n") })));
     } else if (j.result) {
       const r = j.result;
       if (r.demo) kids.push(h("div", { class: "demo-banner" }, h("strong", { text: "Synthetic demo output. " }), "Generated in your browser to show the layout. No model ran — connect a backend for real results."));
       else if (r.mock) kids.push(h("div", { class: "demo-banner" }, h("strong", { text: "Mock server output. " }), "The backend is in mock mode (deterministic stand-ins, no weights). Not model output."));
       kids.push(h("div", { class: "summary" }, r.summary.map(s => h("div", {}, h("b", { text: String(s.value) }), s.label))));
-      const ctx = { file: name => fileUrl(j.id, name), channel: (pid, i) => channel(j.id, pid, i) };
+      const ctx = { file: name => fileUrl(j.id, name), channel: (pid, i) => channel(j.id, pid, i), patch: (x, y, sz) => patchUrl(j.id, x, y, sz) };
       kids.push(h("div", { class: "panels" }, r.panels.map(p => Viewers.render(p, ctx))));
       if (r.files && r.files.length) kids.push(h("div", { style: "margin-top:22px" }, h("h3", { text: "Downloads", style: "margin-bottom:8px" }),
         h("div", { class: "files" }, r.files.map(f => h("a", { href: fileUrl(j.id, f.name), download: f.name }, h("strong", { text: f.name }), h("span", { text: `${f.label} · ${(f.size / 1048576).toFixed(f.size > 1048576 ? 1 : 3)} MB` }))))));
@@ -427,14 +454,22 @@
 
   function renderStatus() {
     const box = $("#serverStatus");
+    const browseBtn = $("#browseWsiBtn");
+    if (browseBtn) browseBtn.hidden = !(S.conn.mode === "server" && S.connected && S.health && S.health.wsi_roots && S.health.wsi_roots.length);
     if (S.conn.mode === "demo") { box.replaceChildren(h("h3", { text: "Demo mode" }), h("p", { class: "small muted", text: "Outputs are generated in the browser and clearly marked as synthetic. Switch to My server for real inference." })); return; }
     if (!S.health) { box.replaceChildren(h("h3", { text: "Server status" }), h("p", { class: "muted small", text: "Connect to see GPU, packages and which models are ready." })); return; }
     const H = S.health, ready = Object.entries(S.ready);
     const notReady = ready.filter(([, v]) => !v.ready);
-    box.replaceChildren(h("h3", { text: "Server status" }),
+    box.replaceChildren(
+      h("div", { style: "display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px" },
+        h("h3", { text: "Server status", style: "margin:0" }),
+        H.cached_model ? h("button", { type: "button", class: "btn ghost small", onclick: async () => {
+          await api("/api/cache/clear", { method: "POST" }); await connect(); renderStatus();
+        } }, "Unload GPU VRAM") : null),
       h("dl", { class: "kv small" }, h("dt", { text: "Device" }), h("dd", { text: H.gpu ? `${H.device} — ${H.gpu}` : H.device }),
         h("dt", { text: "Mode" }), h("dd", { text: H.mock ? "Mock (synthetic outputs)" : "Real inference" }),
         h("dt", { text: "Models ready" }), h("dd", { text: `${ready.length - notReady.length} of ${ready.length}` }),
+        h("dt", { text: "Cached model" }), h("dd", { text: H.cached_model || "None" }),
         h("dt", { text: "Slide folders" }), h("dd", { text: H.wsi_roots.length ? H.wsi_roots.join(", ") : "None — uploads only" })),
       h("div", { class: "status-grid", style: "margin-top:12px" }, Object.entries(H.packages).map(([k, v]) => h("span", {}, h("span", { class: "dot " + (v ? "ok" : "warn") }), k))),
       notReady.length ? h("details", { style: "margin-top:12px" }, h("summary", { text: `${notReady.length} models need setup` }),
