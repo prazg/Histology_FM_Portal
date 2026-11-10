@@ -44,7 +44,7 @@ ${b}Histology FM Portal — setup${r}
 This will, asking before each step:
   1. choose an install folder          6. create a Python environment for the server
   2. check / install Git                7. write the server config (with a new portal key)
-  3. install uv (Python manager)        8. connect your Hugging Face account (optional now)
+  3. install uv (Python manager)        8. Hugging Face token: y/n (optional, can skip)
   4. install Python 3.11 (via uv)       9. start the server in test mode and open the portal
   5. download the portal code           …then the portal's setup wizard takes over.
 ${d}Repository: $REPO
@@ -135,20 +135,76 @@ PY
 )"
 ok "config.yaml written (portal key generated, guided setup on, test mode on)"
 
-step "Hugging Face account"
-echo "  Many models are 'gated': you request access on each model's page, and the server downloads them with your token."
-if "$PY" -c "from huggingface_hub import get_token, whoami; t=get_token(); print(whoami(token=t)['name']) if t else exit(1)" 2>/dev/null; then
-  ok "already logged in"
+step "Hugging Face token (optional)"
+# This step can never stop the installer: any problem here just skips to starting the server.
+HF="$(mktemp "${TMPDIR:-/tmp}/fm-portal-hf.XXXXXX")"
+cat > "$HF" <<'PY'
+import os, sys
+out = sys.stdout
+sys.stderr = open(os.devnull, "w")   # keep library warnings out of the installer's output
+os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+def say(m): print("  " + m, file=out, flush=True)
+def main():
+    mode = sys.argv[1] if len(sys.argv) > 1 else "check"
+    try:
+        import truststore; truststore.inject_into_ssl()   # university / NHS proxies
+    except Exception:
+        pass
+    from huggingface_hub import constants, get_token
+    if mode == "check":                                    # offline: is a token already saved?
+        return 0 if get_token() else 1
+    tok = os.environ.get("HF_NEW_TOKEN", "").strip()
+    if not tok.startswith("hf_"):
+        say("That doesn't look like a token - Hugging Face tokens start with hf_."); return 1
+    from huggingface_hub import login, whoami
+    try:
+        name = whoami(token=tok)["name"]
+    except Exception as e:
+        if getattr(getattr(e, "response", None), "status_code", None) in (401, 403):
+            say("Hugging Face rejected that token (mistyped, expired or revoked?)."); return 1
+        os.makedirs(os.path.dirname(constants.HF_TOKEN_PATH), exist_ok=True)
+        with open(constants.HF_TOKEN_PATH, "w") as f: f.write(tok)
+        say("Couldn't reach huggingface.co to check it (%s). Saved it anyway; the portal checks it later." % type(e).__name__)
+        return 2
+    login(token=tok, add_to_git_credential=False, skip_if_logged_in=False)
+    say("Logged in to Hugging Face as %s." % name); return 0
+try:
+    sys.exit(main())
+except SystemExit:
+    raise
+except BaseException as e:
+    say("Couldn't save the token (%s). You can add it later in the portal." % type(e).__name__); sys.exit(3)
+PY
+LATER="skipped — add it later in the portal (setup wizard, 'Hugging Face' step)"
+echo "  Gated models need a free Hugging Face account and a READ token. Skipping is fine."
+if "$PY" "$HF" check >/dev/null 2>&1; then
+  if askno "A Hugging Face token is already saved on this computer. Replace it?"; then WANT=1; else WANT=0; ok "keeping the saved token"; fi
 else
-  if askno "Do you need to create a free Hugging Face account first?"; then openurl "https://huggingface.co/join"; fi
-  echo "  Create a READ token at https://huggingface.co/settings/tokens (never type your password here)."
-  printf '  Paste the token now, or press Enter to do it later in the portal: '
-  TOKEN=""; if [ "$YES" != 1 ]; then stty -echo < "$TTY" 2>/dev/null || true; read -r TOKEN < "$TTY" || true; stty echo < "$TTY" 2>/dev/null || true; echo; fi
-  if [ -n "$TOKEN" ]; then
-    HF_NEW_TOKEN="$TOKEN" "$PY" -c "import os; from huggingface_hub import login, whoami; t=os.environ['HF_NEW_TOKEN']; print('  logged in as', whoami(token=t)['name']); login(token=t)" \
-      && ok "token saved" || warn "That token was rejected — you can add it later in the portal."
-  fi
+  if askno "Add your Hugging Face token now? (y = paste it, n = skip and start the server)"; then WANT=1; else WANT=0; ok "$LATER"; fi
 fi
+if [ "$WANT" = 1 ]; then
+  if askno "Do you need to create a free Hugging Face account first?"; then openurl "https://huggingface.co/join"; fi
+  echo "  Make a READ token at https://huggingface.co/settings/tokens — never type your password here."
+  if askno "Open the token page in your browser now?"; then openurl "https://huggingface.co/settings/tokens"; fi
+  DONE=0; i=0
+  while [ "$DONE" = 0 ] && [ "$i" -lt 3 ]; do
+    i=$((i+1))
+    printf '  Paste the token and press Enter (it stays hidden; Enter on its own skips): '
+    TOKEN=""; stty -echo < "$TTY" 2>/dev/null || true; read -r TOKEN < "$TTY" || TOKEN=""; stty echo < "$TTY" 2>/dev/null || true; echo
+    TOKEN="$(printf '%s' "$TOKEN" | tr -d '[:space:]')"
+    if [ -z "$TOKEN" ]; then ok "$LATER"; DONE=1; break; fi
+    RC=0; HF_NEW_TOKEN="$TOKEN" "$PY" "$HF" save || RC=$?
+    case "$RC" in
+      0) ok "token saved"; DONE=1;;
+      2) warn "token saved, not yet verified"; DONE=1;;
+      3) DONE=1;;
+      *) if ! askno "Try another token?"; then ok "$LATER"; DONE=1; fi;;
+    esac
+  done
+  [ "$DONE" = 1 ] || ok "$LATER"
+  unset TOKEN
+fi
+rm -f "$HF"
 
 step "Start the server and open the portal"
 URL="${PORTAL%/}/#setup&url=http://127.0.0.1:${PORT}&key=${KEY}"

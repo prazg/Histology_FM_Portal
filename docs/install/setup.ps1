@@ -33,7 +33,7 @@ Write-Host @"
 This will, asking before each step:
   1. choose an install folder          6. create a Python environment for the server
   2. check / install Git                7. write the server config (with a new portal key)
-  3. install uv (Python manager)        8. connect your Hugging Face account (optional now)
+  3. install uv (Python manager)        8. Hugging Face token: y/n (optional, can skip)
   4. install Python 3.11 (via uv)       9. start the server in test mode and open the portal
   5. download the portal code           ...then the portal's setup wizard takes over.
 Repository: $Repo
@@ -117,24 +117,83 @@ $Key = (& $Py $cfgFile (Join-Path $B "config.yaml") $Origin | Select-Object -Las
 Remove-Item $cfgFile
 Ok "config.yaml written (portal key generated, guided setup on, test mode on)"
 
-Step "Hugging Face account"
-Write-Host "  Many models are 'gated': you request access on each model's page, and the server downloads them with your token."
-& $Py -c "from huggingface_hub import get_token, whoami; t=get_token(); print('  logged in as', whoami(token=t)['name']) if t else exit(1)" 2>$null
-if ($LASTEXITCODE -eq 0) { Ok "already logged in" }
-else {
-  if (AskNo "Do you need to create a free Hugging Face account first?") { Start-Process "https://huggingface.co/join" }
-  Write-Host "  Create a READ token at https://huggingface.co/settings/tokens (never type your password here)."
-  $tok = ""
-  if (-not $Yes) {
-    $sec = Read-Host "  Paste the token now, or press Enter to do it later in the portal" -AsSecureString
-    $tok = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec))
+Step "Hugging Face token (optional)"
+# This step can never stop the installer: any problem here just skips to starting the server.
+$hfScript = @'
+import os, sys
+out = sys.stdout
+sys.stderr = open(os.devnull, "w")   # library warnings must not reach PowerShell's error stream
+os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+def say(m): print("  " + m, file=out, flush=True)
+def main():
+    mode = sys.argv[1] if len(sys.argv) > 1 else "check"
+    try:
+        import truststore; truststore.inject_into_ssl()   # university / NHS proxies
+    except Exception:
+        pass
+    from huggingface_hub import constants, get_token
+    if mode == "check":                                    # offline: is a token already saved?
+        return 0 if get_token() else 1
+    tok = os.environ.get("HF_NEW_TOKEN", "").strip()
+    if not tok.startswith("hf_"):
+        say("That doesn't look like a token - Hugging Face tokens start with hf_."); return 1
+    from huggingface_hub import login, whoami
+    try:
+        name = whoami(token=tok)["name"]
+    except Exception as e:
+        if getattr(getattr(e, "response", None), "status_code", None) in (401, 403):
+            say("Hugging Face rejected that token (mistyped, expired or revoked?)."); return 1
+        os.makedirs(os.path.dirname(constants.HF_TOKEN_PATH), exist_ok=True)
+        with open(constants.HF_TOKEN_PATH, "w") as f: f.write(tok)
+        say("Couldn't reach huggingface.co to check it (%s). Saved it anyway; the portal checks it later." % type(e).__name__)
+        return 2
+    login(token=tok, add_to_git_credential=False, skip_if_logged_in=False)
+    say("Logged in to Hugging Face as %s." % name); return 0
+try:
+    sys.exit(main())
+except SystemExit:
+    raise
+except BaseException as e:
+    say("Couldn't save the token (%s). You can add it later in the portal." % type(e).__name__); sys.exit(3)
+'@
+$hfFile = Join-Path $env:TEMP "fm-portal-hf.py"
+$later = "skipped - add it later in the portal (setup wizard, 'Hugging Face' step)"
+$prevEap = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+$prevNative = $PSNativeCommandUseErrorActionPreference; $PSNativeCommandUseErrorActionPreference = $false   # PowerShell 7.3+
+try {
+  Set-Content -Path $hfFile -Value $hfScript -Encoding UTF8
+  Write-Host "  Gated models need a free Hugging Face account and a READ token. Skipping is fine."
+  & $Py $hfFile check | Out-Null
+  $has = ($LASTEXITCODE -eq 0)
+  if ($has) { $want = AskNo "A Hugging Face token is already saved on this computer. Replace it?" }
+  else      { $want = AskNo "Add your Hugging Face token now? (y = paste it, n = skip and start the server)" }
+  if (-not $want) { if ($has) { Ok "keeping the saved token" } else { Ok $later } }
+  else {
+    if (AskNo "Do you need to create a free Hugging Face account first?") { Start-Process "https://huggingface.co/join" }
+    Write-Host "  Make a READ token at https://huggingface.co/settings/tokens - never type your password here."
+    if (AskNo "Open the token page in your browser now?") { Start-Process "https://huggingface.co/settings/tokens" }
+    $done = $false
+    for ($i = 1; $i -le 3 -and -not $done; $i++) {
+      $sec = Read-Host "  Paste the token and press Enter (it stays hidden; Enter on its own skips)" -AsSecureString
+      $tok = ([System.Net.NetworkCredential]::new("", $sec).Password).Trim()
+      if (-not $tok) { Ok $later; $done = $true; break }
+      $env:HF_NEW_TOKEN = $tok
+      & $Py $hfFile save
+      $rc = $LASTEXITCODE
+      Remove-Item Env:\HF_NEW_TOKEN -ErrorAction SilentlyContinue
+      if ($rc -eq 0) { Ok "token saved"; $done = $true }
+      elseif ($rc -eq 2) { Warn "token saved, not yet verified"; $done = $true }
+      elseif ($rc -eq 3) { $done = $true }
+      elseif (-not (AskNo "Try another token?")) { Ok $later; $done = $true }
+    }
+    if (-not $done) { Ok $later }
   }
-  if ($tok) {
-    $env:HF_NEW_TOKEN = $tok
-    & $Py -c "import os; from huggingface_hub import login, whoami; t=os.environ['HF_NEW_TOKEN']; print('  logged in as', whoami(token=t)['name']); login(token=t)"
-    if ($LASTEXITCODE -eq 0) { Ok "token saved" } else { Warn "That token was rejected - you can add it later in the portal." }
-    Remove-Item Env:\HF_NEW_TOKEN
-  }
+} catch {
+  Warn "The Hugging Face step hit a problem ($($_.Exception.Message)). Skipping it - add the token later in the portal."
+} finally {
+  $ErrorActionPreference = $prevEap; $PSNativeCommandUseErrorActionPreference = $prevNative
+  Remove-Item Env:\HF_NEW_TOKEN -ErrorAction SilentlyContinue
+  Remove-Item $hfFile -ErrorAction SilentlyContinue
 }
 
 Step "Start the server and open the portal"
