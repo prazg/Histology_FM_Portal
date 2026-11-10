@@ -26,12 +26,7 @@ GitHub Pages cannot run Python or a GPU, so the page itself never runs a model. 
 
 ## Quick start
 
-### 1. Publish the portal
-Push this folder to a GitHub repository. Then go to **Settings → Pages → Build and deployment**, choose **Deploy from a branch**, and select `main` and `/docs`. The site appears at `https://<user>.github.io/<repo>/`.
-
-To preview locally, run `cd docs && python -m http.server 8080` and open http://localhost:8080. (Opening `index.html` directly from disk does not work, because the page loads `models.json` over HTTP.)
-
-### 2. Try it without a GPU
+### 1. Try it without a GPU
 Open **Connect → Demo**. This generates synthetic outputs in the browser so you can explore every viewer. The results are clearly labelled as synthetic.
 
 To exercise the real API end to end without weights, run the server in mock mode:
@@ -41,7 +36,7 @@ MOCK=1 bash start_server.sh          # Windows: .\start_server.ps1 -Mock
 python tests/test_api_mock.py        # runs every model × task (95 runs) plus the weights/hardware API
 ```
 
-### 3. Run real models
+### 2. Run real models
 ```bash
 cd backend
 pip install -r requirements.txt                        # install torch/torchvision for your CUDA first
