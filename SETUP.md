@@ -23,7 +23,7 @@ Pick one route:
    3. downloads the portal code into `~/histology-fm-portal` (you can change the folder);
    4. creates the server's Python environment (`backend/.venv`);
    5. writes `backend/config.yaml` with a new private **portal key**, your portal's address, and test mode switched on;
-   6. optionally saves your Hugging Face **access token** (never your password);
+   6. asks *Add your Hugging Face token now? [y/N]*: **y** lets you paste a Read **access token** (hidden as you paste it; never your password), **n** skips straight to starting the server. You can add the token later in the wizard. This step never stops the installer: if the token is rejected you can try again or skip, and if huggingface.co can't be reached (e.g. a university proxy) the token is saved and checked later;
    7. starts the server and reopens the portal, already connected.
 
    Keep that window open: it *is* the server. To read the script before running it, open `install/setup.ps1` or `install/setup.sh` on the portal site.
