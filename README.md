@@ -1,6 +1,6 @@
 # Histology FM Portal
 
-A graphical front end for open-weight histology foundation models. It is a static site that can be hosted on GitHub Pages (`docs/`), plus a small FastAPI inference server (`backend/`) that you run on a GPU machine.
+A graphical front end for open-weight histology foundation models. 
 
 Choose a model, give it tiles or a whole slide, and the portal returns outputs that match the model type:
 
