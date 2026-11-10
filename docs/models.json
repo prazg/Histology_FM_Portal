@@ -1,9 +1,10 @@
 {
- "version": "2026-10-29",
+ "version": "2026-11-09",
  "verified_against": {
   "T": "TRIDENT README encoder tables (github.com/mahmoodlab/TRIDENT, main @ 2026-10-29)",
   "HF": "Hugging Face model card / file listing (2026-10-29)",
-  "GH": "Model's own GitHub README / notebooks (2026-10-29)"
+  "GH": "Model's own GitHub README / notebooks (2026-10-29)",
+  "HFsize": "Weight file sizes from Hugging Face file listings (2026-11-09)"
  },
  "categories": {
   "patch": {
@@ -138,7 +139,22 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "MahmoodLab/uni",
+     "type": "model",
+     "files": [
+      "pytorch_model.bin",
+      "config.json"
+     ],
+     "gb": 1.214
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 1.214,
+   "runtime_weights_gb": 1.21
   },
   {
    "id": "uni_v2",
@@ -160,7 +176,22 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "MahmoodLab/UNI2-h",
+     "type": "model",
+     "files": [
+      "pytorch_model.bin",
+      "config.json"
+     ],
+     "gb": 2.726
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 2.726,
+   "runtime_weights_gb": 2.73
   },
   {
    "id": "conch_v15",
@@ -182,7 +213,22 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": "Vision tower used by TITAN. Text encoder is only exposed through TITAN, so zero-shot runs at slide level (see TITAN)."
+   "notes": "Vision tower used by TITAN. Text encoder is only exposed through TITAN, so zero-shot runs at slide level (see TITAN).",
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "MahmoodLab/conchv1_5",
+     "type": "model",
+     "files": [
+      "pytorch_model_vision.bin",
+      "meta.yaml"
+     ],
+     "gb": 1.227
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 1.227,
+   "runtime_weights_gb": 1.23
   },
   {
    "id": "virchow",
@@ -204,7 +250,22 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "paige-ai/Virchow",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json"
+     ],
+     "gb": 2.525
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 2.525,
+   "runtime_weights_gb": 2.52
   },
   {
    "id": "virchow2",
@@ -226,7 +287,22 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": "2560-d = CLS token concatenated with mean of patch tokens (register tokens 1-4 skipped)."
+   "notes": "2560-d = CLS token concatenated with mean of patch tokens (register tokens 1-4 skipped).",
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "paige-ai/Virchow2",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json"
+     ],
+     "gb": 2.525
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 2.525,
+   "runtime_weights_gb": 2.52
   },
   {
    "id": "virchow2-cls",
@@ -248,7 +324,22 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "paige-ai/Virchow2",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json"
+     ],
+     "gb": 2.525
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 2.525,
+   "runtime_weights_gb": 2.52
   },
   {
    "id": "phikon",
@@ -270,7 +361,23 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "owkin/phikon",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json",
+      "preprocessor_config.json"
+     ],
+     "gb": 0.346
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 0.346,
+   "runtime_weights_gb": 0.35
   },
   {
    "id": "phikon_v2",
@@ -292,7 +399,23 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "owkin/phikon-v2",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json",
+      "preprocessor_config.json"
+     ],
+     "gb": 1.213
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 1.213,
+   "runtime_weights_gb": 1.21
   },
   {
    "id": "gigapath",
@@ -314,7 +437,22 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": "Tile encoder. Its LongNet slide encoder is listed separately under slide encoders. Also feeds STPath."
+   "notes": "Tile encoder. Its LongNet slide encoder is listed separately under slide encoders. Also feeds STPath.",
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "prov-gigapath/prov-gigapath",
+     "type": "model",
+     "files": [
+      "pytorch_model.bin",
+      "config.json"
+     ],
+     "gb": 4.54
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 4.54,
+   "runtime_weights_gb": 4.54
   },
   {
    "id": "gigapath-flash",
@@ -336,7 +474,22 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "prov-gigapath/prov-gigapath-flash",
+     "type": "model",
+     "files": [
+      "pytorch_model.bin",
+      "config.json"
+     ],
+     "gb": 0.087
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 0.087,
+   "runtime_weights_gb": 0.09
   },
   {
    "id": "hoptimus0",
@@ -358,7 +511,22 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "bioptimus/H-optimus-0",
+     "type": "model",
+     "files": [
+      "pytorch_model.bin",
+      "config.json"
+     ],
+     "gb": 4.539
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 4.539,
+   "runtime_weights_gb": 4.54
   },
   {
    "id": "hoptimus1",
@@ -380,7 +548,22 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "bioptimus/H-optimus-1",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json"
+     ],
+     "gb": 4.539
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 4.539,
+   "runtime_weights_gb": 4.54
   },
   {
    "id": "h0-mini",
@@ -402,7 +585,22 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "bioptimus/H0-mini",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json"
+     ],
+     "gb": 0.343
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 0.343,
+   "runtime_weights_gb": 0.34
   },
   {
    "id": "midnight12k",
@@ -424,7 +622,22 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "kaiko-ai/midnight",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json"
+     ],
+     "gb": 4.546
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 4.546,
+   "runtime_weights_gb": 4.55
   },
   {
    "id": "openmidnight",
@@ -446,7 +659,21 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "SophontAI/OpenMidnight",
+     "type": "model",
+     "files": [
+      "teacher_checkpoint_load.pt"
+     ],
+     "gb": 4.539
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 4.539,
+   "runtime_weights_gb": 4.54
   },
   {
    "id": "gpfm",
@@ -468,7 +695,21 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "majiabo/GPFM",
+     "type": "model",
+     "files": [
+      "GPFM.pth"
+     ],
+     "gb": 1.213
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 1.213,
+   "runtime_weights_gb": 1.21
   },
   {
    "id": "genbio-pathfm",
@@ -490,7 +731,21 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "genbio-ai/genbio-pathfm",
+     "type": "model",
+     "files": [
+      "model.pth"
+     ],
+     "gb": 4.535
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 4.535,
+   "runtime_weights_gb": 4.54
   },
   {
    "id": "hibou_l",
@@ -512,7 +767,25 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "histai/hibou-L",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json",
+      "configuration_dinov2.py",
+      "modeling_dinov2.py",
+      "preprocessor_config.json"
+     ],
+     "gb": 1.215
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 1.215,
+   "runtime_weights_gb": 1.22
   },
   {
    "id": "phaet",
@@ -534,7 +807,23 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "wearewaiv/phaet",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json",
+      "modeling_finetuned_encoder.py"
+     ],
+     "gb": 1.213
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 1.213,
+   "runtime_weights_gb": 1.21
   },
   {
    "id": "mascaret",
@@ -556,7 +845,23 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "wearewaiv/mascaret",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json",
+      "modeling_finetuned_encoder.py"
+     ],
+     "gb": 4.546
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 4.546,
+   "runtime_weights_gb": 4.55
   },
   {
    "id": "lunit-vits8",
@@ -578,7 +883,22 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "1aurent/vit_small_patch8_224.lunit_dino",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json"
+     ],
+     "gb": 0.087
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 0.087,
+   "runtime_weights_gb": 0.09
   },
   {
    "id": "kaiko-vits8",
@@ -600,7 +920,22 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": "TRIDENT lists 384/768/1024-d for the S/B/L variants; per-variant dim assigned by ViT width."
+   "notes": "TRIDENT lists 384/768/1024-d for the S/B/L variants; per-variant dim assigned by ViT width.",
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "1aurent/vit_small_patch8_224.kaiko_ai_towards_large_pathology_fms",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json"
+     ],
+     "gb": 0.087
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 0.087,
+   "runtime_weights_gb": 0.09
   },
   {
    "id": "kaiko-vits16",
@@ -622,7 +957,22 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": "TRIDENT lists 384/768/1024-d for the S/B/L variants; per-variant dim assigned by ViT width."
+   "notes": "TRIDENT lists 384/768/1024-d for the S/B/L variants; per-variant dim assigned by ViT width.",
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "1aurent/vit_small_patch16_224.kaiko_ai_towards_large_pathology_fms",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json"
+     ],
+     "gb": 0.087
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 0.087,
+   "runtime_weights_gb": 0.09
   },
   {
    "id": "kaiko-vitb8",
@@ -644,7 +994,22 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": "TRIDENT lists 384/768/1024-d for the S/B/L variants; per-variant dim assigned by ViT width."
+   "notes": "TRIDENT lists 384/768/1024-d for the S/B/L variants; per-variant dim assigned by ViT width.",
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "1aurent/vit_base_patch8_224.kaiko_ai_towards_large_pathology_fms",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json"
+     ],
+     "gb": 0.343
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 0.343,
+   "runtime_weights_gb": 0.34
   },
   {
    "id": "kaiko-vitb16",
@@ -666,7 +1031,22 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": "TRIDENT lists 384/768/1024-d for the S/B/L variants; per-variant dim assigned by ViT width."
+   "notes": "TRIDENT lists 384/768/1024-d for the S/B/L variants; per-variant dim assigned by ViT width.",
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "1aurent/vit_base_patch16_224.kaiko_ai_towards_large_pathology_fms",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json"
+     ],
+     "gb": 0.343
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 0.343,
+   "runtime_weights_gb": 0.34
   },
   {
    "id": "kaiko-vitl14",
@@ -688,7 +1068,22 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": "TRIDENT lists 384/768/1024-d for the S/B/L variants; per-variant dim assigned by ViT width."
+   "notes": "TRIDENT lists 384/768/1024-d for the S/B/L variants; per-variant dim assigned by ViT width.",
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "1aurent/vit_large_patch14_reg4_dinov2.kaiko_ai_towards_large_pathology_fms",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json"
+     ],
+     "gb": 1.218
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 1.218,
+   "runtime_weights_gb": 1.22
   },
   {
    "id": "ctranspath",
@@ -710,7 +1105,21 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": "Runs at 10x. Patch encoder for the CHIEF slide encoder."
+   "notes": "Runs at 10x. Patch encoder for the CHIEF slide encoder.",
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "MahmoodLab/hest-bench",
+     "type": "dataset",
+     "files": [
+      "fm_v1/ctranspath/CHIEF_CTransPath.pth"
+     ],
+     "gb": 0.111
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 0.111,
+   "runtime_weights_gb": 0.11
   },
   {
    "id": "resnet50",
@@ -732,7 +1141,22 @@
     "embed_wsi"
    ],
    "source": "T",
-   "notes": "Not a pathology model — natural-image baseline for comparisons."
+   "notes": "Not a pathology model — natural-image baseline for comparisons.",
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "timm/resnet50.tv_in1k",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json"
+     ],
+     "gb": 0.102
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 0.102,
+   "runtime_weights_gb": 0.1
   },
   {
    "id": "conch_v1",
@@ -757,7 +1181,21 @@
    ],
    "source": "T+GH",
    "notes": "Zero-shot uses projected, L2-normalised image and text embeddings scaled by the model's logit_scale (CONCH starter notebook).",
-   "zeroshot_adapter": "conch"
+   "zeroshot_adapter": "conch",
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "MahmoodLab/conch",
+     "type": "model",
+     "files": [
+      "pytorch_model.bin"
+     ],
+     "gb": 0.802
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 0.802,
+   "runtime_weights_gb": 0.8
   },
   {
    "id": "musk",
@@ -782,7 +1220,21 @@
    ],
    "source": "T+GH",
    "notes": "Zero-shot uses with_head=True, out_norm=True, ms_aug=False (MUSK README). Logit scale not documented: portal uses 100.",
-   "zeroshot_adapter": "musk"
+   "zeroshot_adapter": "musk",
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "xiangjx/musk",
+     "type": "model",
+     "files": [
+      "model.safetensors"
+     ],
+     "gb": 1.35
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 1.35,
+   "runtime_weights_gb": 1.35
   },
   {
    "id": "keep",
@@ -807,7 +1259,25 @@
    ],
    "source": "T+HF",
    "notes": "Knowledge-enhanced VLM (ViT-L/16 + BERT). Logit scale not documented: portal uses 100.",
-   "zeroshot_adapter": "keep"
+   "zeroshot_adapter": "keep",
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "Astaxanthin/KEEP",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json",
+      "modeling_keep.py",
+      "tokenizer_config.json",
+      "vocab.txt"
+     ],
+     "gb": 1.657
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 1.657,
+   "runtime_weights_gb": 1.66
   },
   {
    "id": "plip",
@@ -832,7 +1302,26 @@
    ],
    "zeroshot_adapter": "plip",
    "source": "HF+GH",
-   "notes": "CLIP model loaded with transformers CLIPModel. Patch size/mag for slides are portal defaults, not from the model card."
+   "notes": "CLIP model loaded with transformers CLIPModel. Patch size/mag for slides are portal defaults, not from the model card.",
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "vinid/plip",
+     "type": "model",
+     "files": [
+      "pytorch_model.bin",
+      "config.json",
+      "preprocessor_config.json",
+      "tokenizer.json",
+      "tokenizer_config.json",
+      "special_tokens_map.json"
+     ],
+     "gb": 0.605
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 0.605,
+   "runtime_weights_gb": 0.6
   },
   {
    "id": "quiltnet_b32",
@@ -857,7 +1346,27 @@
    ],
    "zeroshot_adapter": "quiltnet",
    "source": "HF",
-   "notes": "CLIP ViT-B/32 via open_clip hf-hub. Patch size/mag for slides are portal defaults, not from the model card."
+   "notes": "CLIP ViT-B/32 via open_clip hf-hub. Patch size/mag for slides are portal defaults, not from the model card.",
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "wisdomik/QuiltNet-B-32",
+     "type": "model",
+     "files": [
+      "open_clip_pytorch_model.bin",
+      "open_clip_config.json",
+      "tokenizer.json",
+      "tokenizer_config.json",
+      "special_tokens_map.json",
+      "vocab.json",
+      "merges.txt"
+     ],
+     "gb": 0.605
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 0.605,
+   "runtime_weights_gb": 0.6
   },
   {
    "id": "slide:titan",
@@ -880,7 +1389,33 @@
     "slide_zeroshot"
    ],
    "source": "T",
-   "notes": "Zero-shot follows the TITAN demo: encode_slide_from_patch_features → zero_shot_classifier(prompts, TEMPLATES) → zero_shot."
+   "notes": "Zero-shot follows the TITAN demo: encode_slide_from_patch_features → zero_shot_classifier(prompts, TEMPLATES) → zero_shot.",
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "MahmoodLab/TITAN",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json",
+      "configuration_titan.py",
+      "modeling_titan.py",
+      "conch_tokenizer.py",
+      "conch_v1_5.py",
+      "text_transformer.py",
+      "vision_transformer.py",
+      "tokenizer.json",
+      "tokenizer_config.json",
+      "special_tokens_map.json"
+     ],
+     "gb": 0.635
+    }
+   ],
+   "requires_models": [
+    "conch_v15"
+   ],
+   "weights_gb": 0.635,
+   "runtime_weights_gb": 1.86
   },
   {
    "id": "slide:prism",
@@ -902,7 +1437,29 @@
     "slide_embed"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "paige-ai/Prism",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json",
+      "configuring_prism.py",
+      "modeling_prism.py",
+      "perceiver.py",
+      "biogpt.py",
+      "biogpt_hf.py"
+     ],
+     "gb": 2.231
+    }
+   ],
+   "requires_models": [
+    "virchow"
+   ],
+   "weights_gb": 2.231,
+   "runtime_weights_gb": 4.76
   },
   {
    "id": "slide:prism2",
@@ -924,7 +1481,35 @@
     "slide_embed"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "paige-ai/Prism2",
+     "type": "model",
+     "files": [
+      "model-00001-of-00004.safetensors",
+      "model-00002-of-00004.safetensors",
+      "model-00003-of-00004.safetensors",
+      "model-00004-of-00004.safetensors",
+      "model.safetensors.index.json",
+      "config.json",
+      "configuration_prism2.py",
+      "modeling_prism2.py",
+      "processing_prism2.py",
+      "processor_config.json",
+      "special_tokens_map.json",
+      "tokenizer.json",
+      "tokenizer_config.json"
+     ],
+     "gb": 17.88
+    }
+   ],
+   "requires_models": [
+    "virchow2-cls"
+   ],
+   "weights_gb": 17.88,
+   "runtime_weights_gb": 20.4
   },
   {
    "id": "slide:chief",
@@ -946,7 +1531,20 @@
     "slide_embed"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "external",
+     "gb": null,
+     "url": "https://github.com/hms-dbmi/CHIEF",
+     "note": "Clone hms-dbmi/CHIEF and download CHIEF_pretraining.pth from the Google Drive link in its README; then set the path in TRIDENT's slide_encoder_models/load_ckpts.json."
+    }
+   ],
+   "requires_models": [
+    "ctranspath"
+   ],
+   "weights_gb": 0,
+   "runtime_weights_gb": null
   },
   {
    "id": "slide:gigapath",
@@ -968,7 +1566,23 @@
     "slide_embed"
    ],
    "source": "T",
-   "notes": "LongNet slide encoder over GigaPath tile embeddings."
+   "notes": "LongNet slide encoder over GigaPath tile embeddings.",
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "prov-gigapath/prov-gigapath",
+     "type": "model",
+     "files": [
+      "slide_encoder.pth"
+     ],
+     "gb": 0.345
+    }
+   ],
+   "requires_models": [
+    "gigapath"
+   ],
+   "weights_gb": 0.345,
+   "runtime_weights_gb": 4.88
   },
   {
    "id": "slide:gigapath-flash",
@@ -990,7 +1604,23 @@
     "slide_embed"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "prov-gigapath/prov-gigapath-flash",
+     "type": "model",
+     "files": [
+      "slide_encoder.pth"
+     ],
+     "gb": 0.086
+    }
+   ],
+   "requires_models": [
+    "gigapath-flash"
+   ],
+   "weights_gb": 0.086,
+   "runtime_weights_gb": 0.17
   },
   {
    "id": "slide:madeleine",
@@ -1012,7 +1642,24 @@
     "slide_embed"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "MahmoodLab/madeleine",
+     "type": "model",
+     "files": [
+      "model.pt",
+      "model_config.json"
+     ],
+     "gb": 0.02
+    }
+   ],
+   "requires_models": [
+    "conch_v1"
+   ],
+   "weights_gb": 0.02,
+   "runtime_weights_gb": 0.82
   },
   {
    "id": "slide:feather",
@@ -1034,7 +1681,27 @@
     "slide_embed"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "MahmoodLab/abmil.base.conch_v15.pc108-24k",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json",
+      "layers.py",
+      "mil_template.py",
+      "modeling_abmil.py"
+     ],
+     "gb": 0.003
+    }
+   ],
+   "requires_models": [
+    "conch_v15"
+   ],
+   "weights_gb": 0.003,
+   "runtime_weights_gb": 1.23
   },
   {
    "id": "slide:feather_uni_v2",
@@ -1056,7 +1723,27 @@
     "slide_embed"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "MahmoodLab/abmil.base.uni_v2.pc108-24k",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json",
+      "layers.py",
+      "mil_template.py",
+      "modeling_abmil.py"
+     ],
+     "gb": 0.005
+    }
+   ],
+   "requires_models": [
+    "uni_v2"
+   ],
+   "weights_gb": 0.005,
+   "runtime_weights_gb": 2.73
   },
   {
    "id": "slide:care",
@@ -1078,7 +1765,28 @@
     "slide_embed"
    ],
    "source": "T",
-   "notes": null
+   "notes": null,
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "Zipper-1/CARE",
+     "type": "model",
+     "files": [
+      "model.safetensors",
+      "config.json",
+      "configuration_care.py",
+      "modeling_care.py",
+      "care_core.py",
+      "__init__.py"
+     ],
+     "gb": 0.075
+    }
+   ],
+   "requires_models": [
+    "conch_v15"
+   ],
+   "weights_gb": 0.075,
+   "runtime_weights_gb": 1.3
   },
   {
    "id": "gigatime",
@@ -1129,7 +1837,22 @@
     "Cy5"
    ],
    "source": "GH+HF",
-   "notes": "23-channel virtual mIF. Channel order from the official gigatime_testing notebook; ImageNet mean/std from the HF config; 512 px input run as 256 px windows; sigmoid applied to logits. TRITC and Cy5 are background channels. 20x is the portal default."
+   "notes": "23-channel virtual mIF. Channel order from the official gigatime_testing notebook; ImageNet mean/std from the HF config; 512 px input run as 256 px windows; sigmoid applied to logits. TRITC and Cy5 are background channels. 20x is the portal default.",
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "prov-gigatime/GigaTIME",
+     "type": "model",
+     "files": [
+      "model.pth",
+      "config.json"
+     ],
+     "gb": 0.037
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 0.037,
+   "runtime_weights_gb": 0.04
   },
   {
    "id": "gigatime-flash",
@@ -1173,7 +1896,11 @@
     "Transgelin"
    ],
    "source": "GH",
-   "notes": "Listed only. The GigaTIMEFlash class is defined inside a notebook, not an importable module, so the portal has no runner yet."
+   "notes": "Listed only. The GigaTIMEFlash class is defined inside a notebook, not an importable module, so the portal has no runner yet.",
+   "weights": [],
+   "requires_models": [],
+   "weights_gb": 0,
+   "runtime_weights_gb": 0
   },
   {
    "id": "hex_nolan48",
@@ -1248,7 +1975,23 @@
     "xiangjx/musk (gated)"
    ],
    "source": "HF+GH",
-   "notes": "48-marker virtual CODEX on a MUSK backbone. Patches resized to 384 px with Inception mean/std (infer_slide_h5_nolan48.py). Slide patches use a 56 µm footprint by default — adjustable."
+   "notes": "48-marker virtual CODEX on a MUSK backbone. Patches resized to 384 px with Inception mean/std (infer_slide_h5_nolan48.py). Slide patches use a 56 µm footprint by default — adjustable.",
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "zli1893/hex_nolan48",
+     "type": "model",
+     "files": [
+      "hex_nolan48.pt"
+     ],
+     "gb": 0.203
+    }
+   ],
+   "requires_models": [
+    "musk"
+   ],
+   "weights_gb": 0.203,
+   "runtime_weights_gb": 1.55
   },
   {
    "id": "stpath",
@@ -1272,7 +2015,23 @@
     "prov-gigapath/prov-gigapath (gated)"
    ],
    "source": "HF",
-   "notes": "Generative spatial-transcriptomics model over GigaPath spot embeddings. Outputs log1p expression per spot."
+   "notes": "Generative spatial-transcriptomics model over GigaPath spot embeddings. Outputs log1p expression per spot.",
+   "weights": [
+    {
+     "via": "hf",
+     "repo": "tlhuang/STPath",
+     "type": "model",
+     "files": [
+      "stfm.pth"
+     ],
+     "gb": 0.197
+    }
+   ],
+   "requires_models": [
+    "gigapath"
+   ],
+   "weights_gb": 0.197,
+   "runtime_weights_gb": 4.74
   },
   {
    "id": "seg:hest",
@@ -1293,7 +2052,17 @@
    "notes": "TRIDENT default. Better on IHC and dirtier slides.",
    "embed_dim": null,
    "patch_size": null,
-   "mag": null
+   "mag": null,
+   "weights": [
+    {
+     "via": "trident-seg",
+     "name": "hest",
+     "gb": 0.486
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 0.486,
+   "runtime_weights_gb": 0.49
   },
   {
    "id": "seg:grandqc",
@@ -1314,7 +2083,17 @@
    "notes": "Fast, accurate on clean H&E. Citation requested.",
    "embed_dim": null,
    "patch_size": null,
-   "mag": null
+   "mag": null,
+   "weights": [
+    {
+     "via": "trident-seg",
+     "name": "grandqc",
+     "gb": 0.027
+    }
+   ],
+   "requires_models": [],
+   "weights_gb": 0.027,
+   "runtime_weights_gb": 0.03
   },
   {
    "id": "seg:otsu",
@@ -1335,7 +2114,42 @@
    "notes": "CPU-only fallback; no model weights.",
    "embed_dim": null,
    "patch_size": null,
-   "mag": null
+   "mag": null,
+   "weights": [],
+   "requires_models": [],
+   "weights_gb": 0,
+   "runtime_weights_gb": 0
   }
- ]
+ ],
+ "hardware_rules": {
+  "source": "Portal rule of thumb, not a benchmark. Replaced by measured speed and peak GPU memory once a model has run on your server.",
+  "tiers": [
+   {
+    "id": "small",
+    "max_gb": 0.4,
+    "label": "CPU OK",
+    "cpu": "Runs on CPU for tiles and slides; a slide takes longer than on a GPU."
+   },
+   {
+    "id": "medium",
+    "max_gb": 1.7,
+    "label": "GPU for slides",
+    "cpu": "Runs on CPU for a handful of tiles; use a GPU for whole slides."
+   },
+   {
+    "id": "large",
+    "max_gb": 10,
+    "label": "GPU recommended",
+    "cpu": "Very slow on CPU even for tiles; use a GPU."
+   },
+   {
+    "id": "xlarge",
+    "max_gb": 1000000000.0,
+    "label": "Large GPU",
+    "cpu": "Needs a GPU with more memory than its weights."
+   }
+  ],
+  "vram_headroom_gb": 2.0,
+  "ram_factor": 2.0
+ }
 }

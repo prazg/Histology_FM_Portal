@@ -11,9 +11,10 @@
   };
 
   const S = {
-    reg: null, byId: {}, conn: { mode: store.get("fm.mode", "demo"), url: store.get("fm.url", "http://127.0.0.1:8000"), key: store.get("fm.key", ""), hf: "" },
+    reg: null, byId: {}, conn: { mode: store.get("fm.mode", "auto"), url: store.get("fm.url", "http://127.0.0.1:8000"), key: store.get("fm.key", ""), hf: "" },
     health: null, ready: {}, connected: false, jobs: [], demoJobs: [], selJob: null, poll: null,
-    filt: { fam: null, q: "", commercial: false, ungated: false, ready: false },
+    bhw: null, weights: {}, perf: {}, wPoll: null, drawerModel: null, serverFound: null,
+    filt: { fam: null, q: "", commercial: false, ungated: false, ready: false, hw: false },
     run: { model: null, task: null, src: "path", tiles: [] },
   };
   try { S.conn.hf = sessionStorage.getItem("fm.hf") || ""; } catch { /* */ }
@@ -23,9 +24,12 @@
   async function api(path, opts = {}) {
     const headers = Object.assign({}, opts.headers || {});
     if (S.conn.key) headers["X-Portal-Key"] = S.conn.key;
-    let r;
-    try { r = await fetch(base() + path, Object.assign({}, opts, { headers })); }
+    let r, timer;
+    const ctl = opts.timeout ? new AbortController() : null;
+    if (ctl) timer = setTimeout(() => ctl.abort(), opts.timeout);
+    try { r = await fetch(base() + path, Object.assign({}, opts, { headers }, ctl ? { signal: ctl.signal } : {})); }
     catch (e) { throw new Error(`Cannot reach ${base()}. Is the server running, and is this page's origin listed in 'origins'?`); }
+    finally { clearTimeout(timer); }
     if (!r.ok) {
       let msg = r.statusText;
       try { const j = await r.json(); msg = j.detail || msg; } catch { /* */ }
@@ -41,11 +45,6 @@
   const channel = (jobId, pid, idx) => {
     if (String(jobId).startsWith("demo")) return Demo.channel(jobId, pid, idx);
     return api(`/api/jobs/${jobId}/spatial/${pid}/${idx}`);
-  };
-  const patchUrl = (jobId, x, y, size) => {
-    if (String(jobId).startsWith("demo")) return null;
-    const q = S.conn.key ? `&key=${encodeURIComponent(S.conn.key)}` : "";
-    return `${base()}/api/jobs/${jobId}/patch?x=${Math.round(x)}&y=${Math.round(y)}&size=${Math.round(size)}${q}`;
   };
 
   // ── routing ──────────────────────────────────────────────────────────
@@ -77,6 +76,9 @@
   const famLabel = c => S.reg.categories[c].label;
   const commercial = m => !!m.commercial_use;
   const isReady = m => S.conn.mode === "demo" ? !!m.runner : !!(S.ready[m.id] && S.ready[m.id].ready);
+  const serverHW = () => (S.connected && S.health && S.health.hardware) ? S.health.hardware : null;
+  const fitFor = m => HW.fit(m, S.reg.hardware_rules, serverHW(), S.bhw, S.perf[m.id]);
+  const hwBadge = m => { const f = fitFor(m); return h("span", { class: "badge hw-" + f.level, title: f.text }, f.badge); };
 
   function outputSummary(m) {
     if (m.category === "vmif") return `${(m.channels || []).length} markers`;
@@ -104,7 +106,8 @@
         h("span", { class: "badges" }, licenceBadge(m), m.gated ? h("span", { class: "badge", title: "Request access on Hugging Face" }, "Access request") : null,
           ready && S.conn.mode === "server" ? h("span", { class: "badge ready" }, "Ready") : null)),
       h("span", { class: "specimen" },
-        h("dl", {}, h("dt", { text: "Output" }), h("dd", { text: outputSummary(m) }), h("dt", { text: "Input" }), h("dd", { text: inputSummary(m) })),
+        h("dl", {}, h("dt", { text: "Output" }), h("dd", { text: outputSummary(m) }), h("dt", { text: "Input" }), h("dd", { text: inputSummary(m) }),
+          h("dt", { text: "Hardware" }), h("dd", {}, hwBadge(m))),
         h("span", { class: "tasks", text: tasks })));
     el.addEventListener("click", () => openDrawer(m));
     return el;
@@ -113,7 +116,7 @@
   function filtered() {
     const f = S.filt, q = f.q.toLowerCase();
     return S.reg.models.filter(m =>
-      (!f.fam || m.category === f.fam) && (!f.commercial || commercial(m)) && (!f.ungated || !m.gated) && (!f.ready || isReady(m)) &&
+      (!f.fam || m.category === f.fam) && (!f.commercial || commercial(m)) && (!f.ungated || !m.gated) && (!f.ready || isReady(m)) && (!f.hw || ["good", "ok"].includes(fitFor(m).level)) &&
       (!q || [m.name, m.developer, m.licence, m.hf_repo, m.id].join(" ").toLowerCase().includes(q)));
   }
 
@@ -136,14 +139,15 @@
         h("div", { class: "rack" }, list.filter(m => m.category === c).map(slideCard)))));
   }
   function resetFilters() {
-    Object.assign(S.filt, { fam: null, q: "", commercial: false, ungated: false, ready: false });
-    $("#q").value = ""; ["#fCommercial", "#fUngated", "#fReady"].forEach(s => ($(s).checked = false));
+    Object.assign(S.filt, { fam: null, q: "", commercial: false, ungated: false, ready: false, hw: false });
+    $("#q").value = ""; ["#fCommercial", "#fUngated", "#fReady", "#fHw"].forEach(s => ($(s).checked = false));
     renderFamilies(); renderRack();
   }
   $("#q").addEventListener("input", e => { S.filt.q = e.target.value; renderRack(); });
   $("#fCommercial").addEventListener("change", e => { S.filt.commercial = e.target.checked; renderRack(); });
   $("#fUngated").addEventListener("change", e => { S.filt.ungated = e.target.checked; renderRack(); });
   $("#fReady").addEventListener("change", e => { S.filt.ready = e.target.checked; renderRack(); });
+  $("#fHw").addEventListener("change", e => { S.filt.hw = e.target.checked; renderRack(); });
 
   function renderCounts() {
     const M = S.reg.models;
@@ -155,8 +159,9 @@
   }
 
   // ── drawer ───────────────────────────────────────────────────────────
-  function openDrawer(m) {
+  function openDrawer(m, keepOpen) {
     const d = $("#drawer");
+    S.drawerModel = m;
     const st = S.ready[m.id];
     const rows = [
       ["Family", famLabel(m.category)], ["Developer", m.developer], ["Output", outputSummary(m)], ["Input", inputSummary(m)],
@@ -164,7 +169,7 @@
       ["Weights", m.link ? h("a", { href: m.link, target: "_blank", rel: "noopener" }, m.hf_repo || m.link) : "—"],
       m.trident_name ? ["TRIDENT name", h("code", { text: m.trident_name })] : null,
       m.patch_encoder ? ["Patch encoder", h("code", { text: m.patch_encoder })] : null,
-      ["Verified against", (m.source || "").split("+").map(k => S.reg.verified_against[k] || k).join("; ")],
+      ["Verified against", [...(m.source || "").split("+"), ...(m.weights && m.weights.length ? ["HFsize"] : [])].map(k => S.reg.verified_against[k] || k).join("; ")],
       S.connected ? ["On your server", st ? (st.ready ? "Ready" : st.reason) : "—"] : null,
     ].filter(Boolean);
     d.replaceChildren(
@@ -173,14 +178,16 @@
         h("button", { class: "icon-btn close-x", "aria-label": "Close", onclick: () => d.close() }, "✕")),
       h("div", { class: "drawer-body" },
         h("dl", { class: "kv" }, rows.flatMap(([k, v]) => [h("dt", { text: k }), h("dd", {}, v)])),
+        hwSection(m),
         m.notes ? h("div", { class: "notice info", text: m.notes }) : null,
         m.channels ? h("details", {}, h("summary", { text: `${m.channels.length} output channels` }), h("p", { class: "small", text: m.channels.join(", ") })) : null,
         (m.tasks || []).length ? h("div", {}, h("h3", { text: "Tasks and outputs", style: "margin-bottom:8px" }),
           h("ul", { class: "small", style: "margin:0;padding-left:1.1em" }, m.tasks.map(t => h("li", {}, h("strong", { text: S.reg.tasks[t].label }), " — ", S.reg.tasks[t].outputs.join("; "))))) : null,
         m.runner ? h("div", {}, h("button", { class: "btn", onclick: () => { d.close(); go("run/" + encodeURIComponent(m.id)); } }, `Run ${m.name}`)) : null));
-    d.showModal();
+    if (!keepOpen) d.showModal();
   }
   $("#drawer").addEventListener("click", e => { if (e.target.id === "drawer") e.target.close(); });
+  $("#drawer").addEventListener("close", () => { S.drawerModel = null; });
 
   // ── run form ─────────────────────────────────────────────────────────
   const PRESETS = {
@@ -304,6 +311,7 @@
   function renderAside(m, t) {
     const cli = cliFor(m, t);
     const kids = [
+      hwSection(m, t),
       h("div", { class: "card" }, h("h3", { text: "What you'll get" }), h("ul", { class: "small" }, S.reg.tasks[t].outputs.map(o => h("li", { text: o })))),
       h("div", { class: commercial(m) ? "notice info" : "notice" },
         h("strong", { text: m.licence + ". " }), commercial(m) ? "Check the model card for attribution terms." : "Academic, non-commercial use only. ",
@@ -331,24 +339,6 @@
     document.querySelectorAll("#wsiInput [data-src]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
     $("#wsiPathField").hidden = S.run.src !== "path"; $("#wsiUploadField").hidden = S.run.src !== "upload";
   }));
-  $("#browseWsiBtn")?.addEventListener("click", async () => {
-    const sel = $("#wsiBrowserSelect");
-    try {
-      const r = await api("/api/wsi/browse");
-      if (!r.slides || !r.slides.length) {
-        sel.replaceChildren(h("option", { value: "", text: "No slides found in allowed_wsi_roots" }));
-      } else {
-        sel.replaceChildren(
-          h("option", { value: "", text: `Choose from ${r.slides.length} slide(s) on server…` }),
-          ...r.slides.map(s => h("option", { value: s.path, text: `${s.name} (${s.size_mb} MB) — ${s.path}` }))
-        );
-      }
-      sel.hidden = false;
-    } catch (e) { alert(e.message); }
-  });
-  $("#wsiBrowserSelect")?.addEventListener("change", e => {
-    if (e.target.value) $("#wsiPath").value = e.target.value;
-  });
 
   $("#runForm").addEventListener("submit", async e => {
     e.preventDefault();
@@ -413,26 +403,22 @@
     if (key === shownKey) return;
     shownKey = key;
     const m = S.byId[j.model_id] || { name: j.model_id, category: "patch" };
-    const isRunning = j.status === "running" || j.status === "queued";
     const head = h("div", { class: "job-head" }, h("h2", { text: m.name }), h("span", { class: "muted", text: taskLabel(j.task) }),
       h("span", { class: "small muted", text: `Job ${j.id} · ${when(j.created)}` }),
-      !String(j.id).startsWith("demo") && isRunning ? h("button", { class: "btn ghost small", style: "margin-left:auto", onclick: async () => {
-        await api(`/api/jobs/${j.id}/cancel`, { method: "POST" }); shownKey = ""; refreshJobs(); } }, "Cancel job") : null,
-      !String(j.id).startsWith("demo") && !isRunning ? h("button", { class: "btn ghost small", style: "margin-left:auto", onclick: async () => {
+      !String(j.id).startsWith("demo") && j.status !== "running" ? h("button", { class: "btn ghost small", style: "margin-left:auto", onclick: async () => {
         await api(`/api/jobs/${j.id}`, { method: "DELETE" }); S.selJob = null; refreshJobs(); } }, "Delete job") : null);
     const kids = [head];
-    if (isRunning) {
+    if (j.status === "queued" || j.status === "running") {
       kids.push(h("div", { class: "progress", role: "progressbar", "aria-valuenow": Math.round(j.progress * 100), "aria-valuemin": 0, "aria-valuemax": 100 }, h("i", { style: `width:${Math.max(3, j.progress * 100)}%` })),
         h("p", { class: "muted", text: j.stage }), h("div", { class: "log", text: j.log.slice(-12).join("\n") }));
-    } else if (j.status === "error" || j.status === "cancelled") {
-      kids.push(h("div", { class: "notice " + (j.status === "cancelled" ? "" : "err") }, h("strong", { text: j.status === "cancelled" ? "Job cancelled. " : "The job failed. " }), j.error || ""),
-        h("details", { open: j.status === "error" }, h("summary", { text: "Server log" }), h("div", { class: "log", text: j.log.join("\n") })));
+    } else if (j.status === "error") {
+      kids.push(h("div", { class: "notice err" }, h("strong", { text: "The job failed. " }), j.error), h("details", { open: true }, h("summary", { text: "Server log" }), h("div", { class: "log", text: j.log.join("\n") })));
     } else if (j.result) {
       const r = j.result;
       if (r.demo) kids.push(h("div", { class: "demo-banner" }, h("strong", { text: "Synthetic demo output. " }), "Generated in your browser to show the layout. No model ran — connect a backend for real results."));
       else if (r.mock) kids.push(h("div", { class: "demo-banner" }, h("strong", { text: "Mock server output. " }), "The backend is in mock mode (deterministic stand-ins, no weights). Not model output."));
       kids.push(h("div", { class: "summary" }, r.summary.map(s => h("div", {}, h("b", { text: String(s.value) }), s.label))));
-      const ctx = { file: name => fileUrl(j.id, name), channel: (pid, i) => channel(j.id, pid, i), patch: (x, y, sz) => patchUrl(j.id, x, y, sz) };
+      const ctx = { file: name => fileUrl(j.id, name), channel: (pid, i) => channel(j.id, pid, i) };
       kids.push(h("div", { class: "panels" }, r.panels.map(p => Viewers.render(p, ctx))));
       if (r.files && r.files.length) kids.push(h("div", { style: "margin-top:22px" }, h("h3", { text: "Downloads", style: "margin-bottom:8px" }),
         h("div", { class: "files" }, r.files.map(f => h("a", { href: fileUrl(j.id, f.name), download: f.name }, h("strong", { text: f.name }), h("span", { text: `${f.label} · ${(f.size / 1048576).toFixed(f.size > 1048576 ? 1 : 3)} MB` }))))));
@@ -448,47 +434,57 @@
     $("#serverFields").hidden = S.conn.mode !== "server";
     $("#cUrl").value = S.conn.url; $("#cKey").value = S.conn.key; $("#cHf").value = S.conn.hf;
     $("#cRemember").checked = (() => { try { return !!localStorage.getItem("fm.key"); } catch { return false; } })();
-    renderStatus();
+    renderStatus(); renderLaunch(); renderWeightsCard();
   }
   document.querySelectorAll("#connForm [name=mode]").forEach(r => r.addEventListener("change", () => { $("#serverFields").hidden = r.value !== "server" || !r.checked; }));
 
   function renderStatus() {
     const box = $("#serverStatus");
-    const browseBtn = $("#browseWsiBtn");
-    if (browseBtn) browseBtn.hidden = !(S.conn.mode === "server" && S.connected && S.health && S.health.wsi_roots && S.health.wsi_roots.length);
     if (S.conn.mode === "demo") { box.replaceChildren(h("h3", { text: "Demo mode" }), h("p", { class: "small muted", text: "Outputs are generated in the browser and clearly marked as synthetic. Switch to My server for real inference." })); return; }
     if (!S.health) { box.replaceChildren(h("h3", { text: "Server status" }), h("p", { class: "muted small", text: "Connect to see GPU, packages and which models are ready." })); return; }
     const H = S.health, ready = Object.entries(S.ready);
     const notReady = ready.filter(([, v]) => !v.ready);
-    box.replaceChildren(
-      h("div", { style: "display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px" },
-        h("h3", { text: "Server status", style: "margin:0" }),
-        H.cached_model ? h("button", { type: "button", class: "btn ghost small", onclick: async () => {
-          await api("/api/cache/clear", { method: "POST" }); await connect(); renderStatus();
-        } }, "Unload GPU VRAM") : null),
-      h("dl", { class: "kv small" }, h("dt", { text: "Device" }), h("dd", { text: H.gpu ? `${H.device} — ${H.gpu}` : H.device }),
+    box.replaceChildren(h("h3", { text: "Server status" }),
+      ...hwDetails(H),
+      h("dl", { class: "kv small" }, h("dt", { text: "Runs on" }), h("dd", { text: H.gpu ? `${H.device} — ${H.gpu}` : H.device }),
         h("dt", { text: "Mode" }), h("dd", { text: H.mock ? "Mock (synthetic outputs)" : "Real inference" }),
         h("dt", { text: "Models ready" }), h("dd", { text: `${ready.length - notReady.length} of ${ready.length}` }),
-        h("dt", { text: "Cached model" }), h("dd", { text: H.cached_model || "None" }),
         h("dt", { text: "Slide folders" }), h("dd", { text: H.wsi_roots.length ? H.wsi_roots.join(", ") : "None — uploads only" })),
       h("div", { class: "status-grid", style: "margin-top:12px" }, Object.entries(H.packages).map(([k, v]) => h("span", {}, h("span", { class: "dot " + (v ? "ok" : "warn") }), k))),
-      notReady.length ? h("details", { style: "margin-top:12px" }, h("summary", { text: `${notReady.length} models need setup` }),
+      notReady.length ? h("details", { style: "margin-top:12px" }, h("summary", { text: `${notReady.length} ${notReady.length === 1 ? "model needs" : "models need"} setup` }),
         h("ul", { class: "small", style: "padding-left:1.1em" }, notReady.map(([id, v]) => h("li", {}, h("strong", { text: (S.byId[id] || {}).name || id }), ": ", v.reason)))) : null);
   }
 
+  function hwDetails(H) {
+    const X = H.hardware;
+    if (!X) return [];
+    const rows = [["CPU", `${X.cpu_cores || "?"} cores · ${X.machine}`], ["RAM", X.ram_total_gb ? `${HW.gbFmt(X.ram_total_gb)} total${X.ram_available_gb ? `, ${HW.gbFmt(X.ram_available_gb)} free` : ""}` : "unknown"],
+      ["PyTorch", X.torch ? `${X.torch}${X.torch_cuda ? ` (CUDA ${X.torch_cuda})` : " (CPU build)"}` : "not installed"],
+      ...(X.gpus.length ? X.gpus.map(g => [`GPU ${g.index}`, `${g.name} · ${HW.gbFmt(g.vram_total_gb)}${g.vram_free_gb != null ? ` (${HW.gbFmt(g.vram_free_gb)} free)` : ""}`])
+        : [["GPU", X.driver_gpus.length ? `${X.driver_gpus[0].name} (not usable by PyTorch)` : X.mps_available ? "Apple GPU (MPS) — not used" : "none"]]),
+      ["Hugging Face", H.hf_logged_in ? "logged in" : "not logged in"]];
+    return [h("dl", { class: "kv small", style: "margin-bottom:10px" }, rows.flatMap(([k, v]) => [h("dt", { text: k }), h("dd", { text: v })])),
+      ...(X.warnings || []).map(w => h("div", { class: "notice small", style: "margin-bottom:10px", text: w }))];
+  }
+
   async function connect() {
-    if (S.conn.mode === "demo") { S.connected = false; S.health = null; S.ready = {}; setPill("warn", "Demo mode"); return true; }
+    if (S.conn.mode === "demo") { S.connected = false; S.health = null; S.ready = {}; setPill("warn", "Demo mode"); renderHwBar(); return true; }
     setPill("", "Connecting…");
     try {
-      S.health = await api("/api/health");
+      S.health = await api("/api/health", { timeout: 15000 });
       S.ready = await api("/api/models");
       S.connected = true;
+      await refreshWeights(true);
+      try { S.perf = await api("/api/perf"); } catch { S.perf = {}; }
       const n = Object.values(S.ready).filter(v => v.ready).length;
-      setPill(S.health.mock ? "warn" : "ok", `${S.health.mock ? "Mock server" : S.health.gpu ? "GPU server" : "CPU server"} · ${n} ready`);
+      const g = S.health.hardware && S.health.hardware.gpus && S.health.hardware.gpus[0];
+      setPill(S.health.mock ? "warn" : "ok", `${S.health.mock ? "Mock server" : g ? g.name.replace(/^NVIDIA /, "") : "CPU server"} · ${n} ready`);
+      renderHwBar();
       return true;
     } catch (e) {
-      S.connected = false; S.health = null; S.ready = {};
+      S.connected = false; S.health = null; S.ready = {}; S.weights = {}; S.perf = {};
       setPill("err", "Not connected");
+      renderHwBar();
       throw e;
     }
   }
@@ -504,8 +500,225 @@
     msg.textContent = S.conn.mode === "demo" ? "" : "Checking…";
     try { await connect(); msg.textContent = S.conn.mode === "demo" ? "Demo mode on." : "Connected."; }
     catch (err) { msg.textContent = err.message; msg.style.color = "var(--err)"; }
-    renderStatus(); renderRack(); if (S.run.model) selectModel(S.run.model.id);
+    renderStatus(); renderWeightsCard(); renderRack(); if (S.run.model) selectModel(S.run.model.id);
   });
+
+
+  // ── hardware & weights ───────────────────────────────────────────────
+  const onLocalhost = () => /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+
+  async function autoConnect() {
+    if (S.conn.mode === "demo") return connect();
+    if (S.conn.mode === "server") { try { await connect(); } catch { /* pill shows it */ } return; }
+    // First visit: probe automatically only when the page itself is served from this computer.
+    // From GitHub Pages, probing localhost can trigger a browser permission prompt, so it waits for a click.
+    if (onLocalhost()) { await findServer(true); return; }
+    S.conn.mode = "demo"; await connect(); setPill("warn", "Demo mode — no server connected");
+  }
+
+  async function findServer(silent) {
+    setPill("", "Looking for a server…");
+    try {
+      await api("/api/health", { timeout: 2500 });
+      S.conn.mode = "server"; store.set("fm.mode", "server"); S.serverFound = "ok";
+      await connect();
+    } catch (e) {
+      if (/^401/.test(e.message)) { S.conn.mode = "server"; S.serverFound = "key"; setPill("warn", "Server found — enter its key"); if (!silent) go("connect"); }
+      else { S.serverFound = "none"; S.conn.mode = "demo"; await connect(); setPill("warn", "No server found — demo mode"); }
+    }
+    renderHwBar(); renderRack(); renderStatus(); renderWeightsCard();
+    if (S.run.model) selectModel(S.run.model.id);
+  }
+
+  function renderHwBar() {
+    const bar = $("#hwBar");
+    if (!bar || !S.reg) return;
+    const H = serverHW();
+    const kids = [];
+    if (H) {
+      const g = (H.gpus || [])[0];
+      const gpuTxt = g ? `${g.name} · ${HW.gbFmt(g.vram_total_gb)} GPU memory${H.gpus.length > 1 ? ` (+${H.gpus.length - 1} more)` : ""}` : "No usable GPU — models run on the CPU";
+      kids.push(h("div", { class: "hw-src" }, h("span", { class: "dot " + (g ? "ok" : "warn") }), h("strong", { text: "Models run on your server" })),
+        h("div", { class: "hw-specs" }, h("span", { text: gpuTxt }), h("span", { text: `${H.cpu_cores || "?"} CPU cores` }),
+          H.ram_total_gb ? h("span", { text: `${HW.gbFmt(H.ram_total_gb)} RAM` }) : null,
+          h("button", { class: "btn ghost small", onclick: () => go("connect") }, "Server details")));
+      (H.warnings || []).forEach(w => kids.push(h("div", { class: "notice", style: "margin-top:8px", text: w })));
+    } else {
+      const b = S.bhw;
+      const gpuTxt = !b ? "Detecting…" : b.gpuShort ? b.gpuShort : "GPU not exposed by this browser";
+      kids.push(h("div", { class: "hw-src" }, h("span", { class: "dot" }), h("strong", { text: "This computer" }), h("span", { class: "muted small", text: "detected by your browser" })),
+        h("div", { class: "hw-specs" }, h("span", { text: gpuTxt }),
+          b && b.cores ? h("span", { text: `${b.cores} CPU threads` }) : null,
+          b && b.memGB ? h("span", { text: `≥ ${b.memGB} GB memory (browser-rounded)` }) : null,
+          h("button", { class: "btn small", onclick: () => findServer(false) }, "Look for a server on this computer"),
+          h("button", { class: "btn ghost small", onclick: () => go("connect") }, "How to start one")),
+        h("p", { class: "small muted", style: "margin:6px 0 0", text: b && b.kind === "nvidia"
+          ? "An NVIDIA GPU is visible, so a server on this computer can use CUDA. GPU memory and CUDA can only be checked by the server — connect one for exact advice."
+          : "The badges on each model assume the server runs on this computer. Connect a server for exact GPU-memory checks." }));
+    }
+    bar.replaceChildren(...kids);
+  }
+
+  function hfCommands(m) {
+    const comps = [m, ...(m.requires_models || []).map(id => S.byId[id])];
+    const lines = [];
+    comps.forEach(c => c.weights.forEach(w => {
+      if (w.via === "hf") lines.push(`hf download ${w.repo} ${w.files.join(" ")}${w.type === "dataset" ? " --repo-type dataset" : ""}`);
+      else if (w.via === "trident-seg") lines.push(`# ${c.name}: downloaded automatically by TRIDENT on first use`);
+      else if (w.via === "external") lines.push(`# ${c.name}: ${w.note}`);
+    }));
+    return lines.join("\n");
+  }
+
+  function weightsRow(m) {
+    const w = S.weights[m.id];
+    if (!w) return null;
+    const noAccess = w.parts.filter(p => p.access === "no-access");
+    const missing = w.parts.filter(p => p.cached === false);
+    const row = h("div", { class: "wrow" });
+    if (w.download === "queued" || w.download === "downloading") {
+      row.append(h("div", { class: "small", text: `Downloading ${w.message || ""}` }),
+        h("div", { class: "progress" }, h("i", { style: `width:${Math.max(3, w.progress * 100)}%` })));
+    } else if (w.overall === "cached") {
+      row.append(h("p", { class: "small ok-text", text: "Weights are already on your server." }));
+    } else if (w.overall === "manual") {
+      const ext = w.parts.find(p => p.via === "external");
+      row.append(h("p", { class: "small", text: ext.note + " " }), ext.url ? h("a", { href: ext.url, target: "_blank", rel: "noopener", class: "small", text: "Open instructions" }) : null);
+    } else if (w.overall !== "none") {
+      const what = w.overall === "unknown" ? "Not sure whether the weights are cached yet." : missing.length ? `${HW.gbFmt(w.missing_gb)} still to download.` : "Some weights are missing.";
+      row.append(h("p", { class: "small", text: what + " Downloading now saves waiting at your first run." }),
+        h("button", { class: "btn small", onclick: () => downloadWeights(m.id) }, w.download === "error" ? "Retry download" : "Download to server"));
+      if (w.download === "error") row.append(h("div", { class: "notice err small", style: "margin-top:8px", text: w.message }));
+    }
+    if (noAccess.length) row.append(h("p", { class: "small", style: "margin-top:6px" }, "No access yet to ",
+      ...noAccess.map((p, i) => [i ? ", " : "", h("a", { href: `https://huggingface.co/${p.repo}`, target: "_blank", rel: "noopener", text: p.repo })]).flat(),
+      ". Request access on Hugging Face, then retry."));
+    return row;
+  }
+
+  function hwSection(m, task) {
+    const f = fitFor(m);
+    const box = h("div", { class: `card hw-card hw-${f.level}` },
+      h("div", { class: "hw-head" }, h("h3", { text: "Hardware" }), h("span", { class: "badge hw-" + f.level, text: f.badge })),
+      h("p", { class: "small", style: "margin-bottom:6px", text: f.text }));
+    const comps = [m, ...(m.requires_models || []).map(id => S.byId[id])];
+    if (m.runtime_weights_gb) box.append(h("p", { class: "small muted", style: "margin-bottom:6px",
+      text: `Weights: ${HW.gbFmt(m.runtime_weights_gb)}` + (comps.length > 1 ? ` — ${comps.map(c => `${c.name} ${HW.gbFmt(c.weights_gb)}`).join(" + ")}` : "") }));
+    if (task) {
+      const tiles = S.reg.tasks[task].input === "tiles";
+      const sp = HW.speedText(S.perf[m.id], task, tiles ? "tiles" : "patches");
+      if (sp) box.append(h("p", { class: "small", style: "margin-bottom:6px", text: "Measured on your server: " + sp }));
+      const best = S.perf[m.id] && S.perf[m.id][task] && Object.values(S.perf[m.id][task]).map(d => d.items_per_s).filter(Boolean)[0];
+      if (tiles && best && S.run.tiles.length) box.append(h("p", { class: "small", text: `About ${Math.max(1, Math.round(S.run.tiles.length / best))} s for your ${S.run.tiles.length} tiles.` }));
+    }
+    if (S.connected && S.conn.mode === "server") { const r = weightsRow(m); if (r) box.append(r); }
+    const cmds = hfCommands(m);
+    if (cmds) box.append(h("details", {}, h("summary", { class: "small", text: "Download weights by hand" }), h("pre", { class: "cli", text: cmds }),
+      h("p", { class: "small muted", style: "margin-top:6px", text: "Run on the server machine after hf auth login. Files land in the Hugging Face cache, where the portal finds them." })));
+    return box;
+  }
+
+  async function refreshWeights(quiet) {
+    if (!(S.connected && S.conn.mode === "server")) return;
+    try { S.weights = await api("/api/weights"); } catch { return; }
+    clearTimeout(S.wPoll);
+    const busy = Object.values(S.weights).some(w => w.download === "queued" || w.download === "downloading");
+    if (busy) S.wPoll = setTimeout(() => refreshWeights(false), 1500);
+    if (!quiet) {
+      if (S.drawerModel) openDrawer(S.drawerModel, true);
+      if (!$("#view-run").hidden && S.run.model) renderAside(S.run.model, S.run.task);
+      if (!$("#view-connect").hidden) renderWeightsCard();
+    }
+  }
+
+  async function downloadWeights(id) {
+    const headers = S.conn.hf ? { "X-HF-Token": S.conn.hf } : {};
+    try { await api(`/api/weights/${encodeURIComponent(id)}/download`, { method: "POST", headers }); }
+    catch (e) { alertInline(e.message); }
+    refreshWeights(false);
+  }
+  function alertInline(msg) { const m = $("#connMsg"); if (m) { m.textContent = msg; m.style.color = "var(--err)"; } }
+
+  function renderWeightsCard() {
+    const box = $("#weightsCard");
+    if (!box) return;
+    if (!(S.connected && S.conn.mode === "server")) { box.hidden = true; return; }
+    box.hidden = false;
+    const W = S.weights, H = S.health || {};
+    const runnable = S.reg.models.filter(m => m.runner && W[m.id]);
+    const cached = runnable.filter(m => W[m.id].overall === "cached");
+    const accessKnown = Object.values(W).some(w => w.parts.some(p => p.access !== "unknown"));
+    const canGet = runnable.filter(m => ["missing", "partial", "unknown"].includes(W[m.id].overall) &&
+      W[m.id].parts.filter(p => p.via === "hf").every(p => p.access === "ok"));
+    const sizeOf = list => { const seen = new Set();   // shared weights (e.g. GigaPath inside STPath, Virchow2 in both variants) count once
+      return list.reduce((a, m) => a + W[m.id].parts.filter(p => p.cached !== true && !seen.has(p.repo || p.model) && seen.add(p.repo || p.model)).reduce((x, p) => x + (p.gb || 0), 0), 0); };
+    const canGetFit = canGet.filter(m => ["good", "ok"].includes(fitFor(m).level));
+    const needGb = sizeOf(canGet), needFitGb = sizeOf(canGetFit);
+    const free = H.hardware && H.hardware.weights_disk_free_gb;
+    const msg = h("span", { class: "small", role: "status" });
+    const rows = runnable.map(m => {
+      const w = W[m.id];
+      const st = w.download === "queued" ? "Queued" : w.download === "downloading" ? `Downloading ${Math.round(w.progress * 100)}%`
+        : { cached: "On server", missing: "Not downloaded", partial: "Partly downloaded", unknown: "Unknown", manual: "Manual download", none: "No weights" }[w.overall];
+      const blocked = w.parts.some(p => p.access === "no-access");
+      return h("tr", {}, h("td", { text: m.name }), h("td", { class: "num", text: HW.gbFmt(m.runtime_weights_gb) }),
+        h("td", {}, h("span", { class: "dot " + (w.overall === "cached" ? "ok" : blocked ? "err" : w.download === "downloading" ? "run" : "") }), " ", blocked ? "No access" : st),
+        h("td", {}, ["missing", "partial", "unknown"].includes(w.overall) && !["queued", "downloading"].includes(w.download) && !blocked
+          ? h("button", { class: "btn ghost small", onclick: () => downloadWeights(m.id) }, "Download") : ""));
+    });
+    box.replaceChildren(
+      h("h3", { text: "Model weights on your server" }),
+      h("p", { class: "small muted", text: `${cached.length} of ${runnable.length} runnable models are ready to go. Weights are stored in ${H.hf_cache || "the Hugging Face cache"}${free != null ? ` (${HW.gbFmt(free)} free)` : ""} — never in the git repository.` }),
+      H.hf_logged_in === false && !S.conn.hf ? h("div", { class: "notice", style: "margin-bottom:10px", text: "The server is not logged in to Hugging Face, so gated models can't be downloaded. Run hf auth login on the server, or add a token above." }) : null,
+      h("div", { style: "display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px" },
+        h("button", { class: "btn ghost small", onclick: async () => {
+          msg.textContent = "Checking access to every repository…";
+          try { await api("/api/weights/access", { method: "POST", headers: S.conn.hf ? { "X-HF-Token": S.conn.hf } : {} }); msg.textContent = ""; }
+          catch (e) { msg.textContent = e.message; }
+          await refreshWeights(true); renderWeightsCard(); renderRack(); } }, accessKnown ? "Re-check access" : "Check my access"),
+        ...[[canGetFit, needFitGb, "Download the ones that suit this hardware"], [canGet, needGb, "Download all I can access"]].map(([list, gb, label], i) =>
+          accessKnown && list.length && !(i === 1 && list.length === canGetFit.length) ? h("button", { class: i === 0 ? "btn small" : "btn ghost small", onclick: async () => {
+            if (free != null && gb > free) { msg.textContent = `Needs ${HW.gbFmt(gb)} but only ${HW.gbFmt(free)} is free on the server.`; return; }
+            for (const m of list) await api(`/api/weights/${encodeURIComponent(m.id)}/download`, { method: "POST", headers: S.conn.hf ? { "X-HF-Token": S.conn.hf } : {} });
+            refreshWeights(false); } }, `${label} (${list.length} models, ${HW.gbFmt(gb)})`) : null),
+        msg),
+      h("div", { class: "table-wrap" }, h("table", { class: "data" },
+        h("thead", {}, h("tr", {}, ["Model", "Size", "Status", ""].map((c, i) => h("th", { class: i === 1 ? "num" : "", text: c })))),
+        h("tbody", {}, rows))));
+  }
+
+  function renderLaunch() {
+    const box = $("#launchCard");
+    if (!box) return;
+    const os = (S.bhw && S.bhw.os) || "Unknown";
+    const tabs = [["win", "Windows"], ["nix", "macOS / Linux"], ["hpc", "HPC (Slurm)"]];
+    let cur = box.dataset.tab || (os === "Windows" ? "win" : "nix");
+    const cmd = {
+      win: "cd path\\to\\fm_portal\\backend\n.\\start_server.ps1\n# try it without any weights first:\n.\\start_server.ps1 -Mock",
+      nix: "cd path/to/fm_portal/backend\nbash start_server.sh\n# try it without any weights first:\nMOCK=1 bash start_server.sh",
+      hpc: "# on the login node, from fm_portal/backend:\nsbatch hpc/serve_slurm.sbatch\n# then follow the ssh -L line printed in the job's log file",
+    };
+    const note = {
+      win: "The script checks Python, installs the server packages if they are missing, prints your hardware and which models are ready, then starts the server on 127.0.0.1:8000.",
+      nix: "The script checks Python, installs the server packages if they are missing, prints your hardware and which models are ready, then starts the server on 127.0.0.1:8000.",
+      hpc: "Edit the partition, GPU and environment lines at the top of the script first. Keep the server behind the SSH tunnel and set portal_key, because a compute node is shared.",
+    };
+    const draw = () => {
+      box.dataset.tab = cur;
+      box.replaceChildren(h("h3", { text: "Start the server" }),
+        h("p", { class: "small muted", text: os !== "Unknown" ? `Your browser reports ${os}.` : "" }),
+        h("div", { class: "seg-ctl", role: "group", "aria-label": "Platform" }, tabs.map(([k, l]) => h("button", { type: "button", "aria-pressed": String(k === cur), onclick: () => { cur = k; draw(); } }, l))),
+        h("pre", { class: "cli", text: cmd[cur] }), h("p", { class: "small", style: "margin-top:8px", text: note[cur] }),
+        h("details", {}, h("summary", { class: "small", text: "First-time install for real models" }),
+          h("ol", { class: "setup small" },
+            h("li", {}, "Install PyTorch with CUDA for your GPU from pytorch.org (CPU-only PyTorch leaves the GPU unused — the portal warns you if this happens)."),
+            h("li", {}, "pip install -r requirements.txt, then clone and install TRIDENT as described in that file."),
+            h("li", {}, "Copy config.example.yaml to config.yaml: add this page's origin, a portal key, slide folders and the GigaTIME / HEX / STPath clones."),
+            h("li", {}, "hf auth login, after requesting access on each gated model's Hugging Face page."),
+            h("li", {}, "Back here: Connect, then Download weights so the first run doesn't wait on downloads."))));
+    };
+    draw();
+  }
 
   // ── boot ─────────────────────────────────────────────────────────────
   (async function boot() {
@@ -513,7 +726,9 @@
     catch (e) { $("#rack").replaceChildren(h("div", { class: "notice err", text: "Could not load models.json. Serve this folder over HTTP (GitHub Pages, or python -m http.server) rather than opening the file directly." })); return; }
     S.reg.models.forEach(m => (S.byId[m.id] = m));
     renderCounts(); renderFamilies(); fillModelSelect();
-    try { await connect(); } catch { /* shown in pill */ }
+    renderHwBar();
+    HW.detectBrowser().then(b => { S.bhw = b; renderHwBar(); renderRack(); if (S.run.model && !$("#view-run").hidden) renderAside(S.run.model, S.run.task); if (!$("#view-connect").hidden) renderLaunch(); });
+    await autoConnect();
     renderRack();
     window.addEventListener("hashchange", route);
     route();

@@ -42,6 +42,7 @@
       </div>
       <div class="counts" id="counts"></div>
     </div>
+    <div class="hw-bar" id="hwBar" aria-live="polite"></div>
     <div class="cat-layout">
       <aside class="filters" aria-label="Filter models">
         <div>
@@ -57,6 +58,7 @@
           <label class="check"><input type="checkbox" id="fCommercial"> Commercial use allowed</label>
           <label class="check"><input type="checkbox" id="fUngated"> No Hugging Face access request</label>
           <label class="check"><input type="checkbox" id="fReady"> Ready on my server</label>
+          <label class="check"><input type="checkbox" id="fHw"> Suits my hardware</label>
         </div>
         <p class="small muted">Weights, dimensions and licences checked on <span id="regDate"></span> against the TRIDENT encoder tables and each model card. Licences change — read the model card before publishing results.</p>
       </aside>
@@ -94,13 +96,8 @@
               <button type="button" data-src="path" aria-pressed="true">Path on server</button>
               <button type="button" data-src="upload" aria-pressed="false">Upload</button>
             </div>
-            <div class="field" id="wsiPathField">
-              <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
-                <label for="wsiPath">Slide path on the backend machine</label>
-                <button type="button" class="btn ghost small" id="browseWsiBtn" hidden>Browse server slides</button>
-              </div>
+            <div class="field" id="wsiPathField"><label for="wsiPath">Slide path on the backend machine</label>
               <input type="text" id="wsiPath" placeholder="/data/wsi/TCGA-GBM/TCGA-06-0125-01Z-00-DX1.svs">
-              <select id="wsiBrowserSelect" hidden aria-label="Available server slides" style="margin-top:4px"></select>
               <span class="hint">Must sit inside a folder listed in <code>allowed_wsi_roots</code>. Best for multi-GB slides.</span></div>
             <div class="field" id="wsiUploadField" hidden><label for="wsiFile">Slide file</label>
               <input type="file" id="wsiFile" accept=".svs,.ndpi,.tif,.tiff,.mrxs,.scn,.czi,.png,.jpg,.jpeg">
@@ -161,18 +158,10 @@
       </form>
       <div class="aside">
         <div class="card" id="serverStatus"><h3>Server status</h3><p class="muted small">Connect to see GPU, packages and which models are ready.</p></div>
-        <div class="card">
-          <h3>Start the backend</h3>
-          <ol class="setup small">
-            <li>On the GPU machine: <code>cd backend</code>, then <code>pip install -r requirements.txt</code> and install TRIDENT as described in that file.</li>
-            <li>Copy <code>config.example.yaml</code> to <code>config.yaml</code>. Add this page's origin, a portal key, your slide folders and the GigaTIME / HEX / STPath clones.</li>
-            <li>Run <code>python -m uvicorn server:app --host 127.0.0.1 --port 8000</code>.</li>
-            <li>Remote machine? Forward the port over SSH (<code>ssh -L 8000:127.0.0.1:8000 gpu-node</code>) and keep the URL as 127.0.0.1, or put it behind an HTTPS tunnel.</li>
-            <li>Gated models: request access on each Hugging Face model page first, then log in on the server.</li>
-          </ol>
-        </div>
+        <div class="card" id="launchCard"></div>
       </div>
     </div>
+    <div class="card" id="weightsCard" hidden style="margin-top:28px"></div>
   </section>
 </main>
 
@@ -184,6 +173,7 @@
 <dialog class="drawer" id="drawer" aria-labelledby="drawerTitle"></dialog>
 
 <script src="assets/viewers.js"></script>
+<script src="assets/hardware.js"></script>
 <script src="assets/demo.js"></script>
 <script src="assets/app.js"></script>
 </body>

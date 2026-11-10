@@ -237,7 +237,6 @@ details summary { cursor: pointer; color: var(--ink-2); padding: 4px 0; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .84rem; color: var(--ink-2); margin-top: 10px; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
-.patch-inspector { display: flex; align-items: center; gap: 14px; margin-top: 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--glass-2); }
 .cbar { height: 10px; width: 220px; border-radius: 2px; }
 .cbar-row { display: flex; align-items: center; gap: 8px; font-size: .8rem; color: var(--ink-3); margin-top: 10px; }
 .ch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
@@ -287,3 +286,29 @@ footer { max-width: 1320px; margin: 0 auto; padding: 20px 24px 40px; color: var(
   .counts { gap: 16px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ── hardware & weights ─────────────────────────────────────────────────── */
+.hw-bar { display: grid; gap: 4px; padding: 12px 16px; margin: -8px 0 26px; border: 1px solid var(--line); border-radius: var(--radius-m);
+  background: var(--paper); }
+.hw-bar:empty { display: none; }
+.hw-src { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hw-specs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; font-size: .93rem; color: var(--ink-2); }
+.hw-specs .btn { margin-left: 0; }
+.hw-specs .btn:first-of-type { margin-left: auto; }
+.badge.hw-good { border-color: color-mix(in srgb, var(--ok) 60%, transparent); color: var(--ok); }
+.badge.hw-ok { border-color: color-mix(in srgb, var(--haem) 55%, transparent); color: var(--haem); }
+.badge.hw-warn { border-color: color-mix(in srgb, var(--warn) 60%, transparent); color: var(--warn); }
+.badge.hw-bad { border-color: color-mix(in srgb, var(--err) 60%, transparent); color: var(--err); }
+.badge.hw-info { color: var(--ink-3); }
+.hw-card { border-left: 4px solid var(--ink-3); }
+.hw-card.hw-good { border-left-color: var(--ok); } .hw-card.hw-ok { border-left-color: var(--haem); }
+.hw-card.hw-warn { border-left-color: var(--warn); } .hw-card.hw-bad { border-left-color: var(--err); }
+.hw-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.hw-head h3 { margin: 0 !important; }
+.wrow { border-top: 1px solid var(--line); padding-top: 8px; margin-top: 4px; }
+.wrow p { margin-bottom: 6px; }
+.ok-text { color: var(--ok); }
+#weightsCard .table-wrap { max-height: 480px; }
+@media (max-width: 640px) { .hw-specs .btn:first-of-type { margin-left: 0; } }
+table.data .dot { display: inline-block; vertical-align: middle; }
+.slide dd .badge { padding: 3px 6px; }
