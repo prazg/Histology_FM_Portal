@@ -1,6 +1,6 @@
 # Histology FM Portal
 
-A graphical front end for open-weight histology foundation models. 
+A graphical front end for open-weight histology foundation models. It is a static site that can be hosted on GitHub Pages (`docs/`), plus a small FastAPI inference server (`backend/`) that you run on a GPU machine.
 
 Choose a model, give it tiles or a whole slide, and the portal returns outputs that match the model type:
 
@@ -24,9 +24,16 @@ GitHub Pages (docs/)  ──HTTPS/localhost──▶  backend/server.py (your GP
 
 GitHub Pages cannot run Python or a GPU, so the page itself never runs a model. Images and slides go only from your browser to *your* server.
 
+> **Want to run models on your own computer or server?** Open the portal: it offers a **guided setup** that hands you a one-line installer and then walks you through PyTorch, TRIDENT, Hugging Face access and weights one step at a time. Prefer to do it by hand, or using a cluster? See **[SETUP.md](SETUP.md)**.
+
 ## Quick start
 
-### 1. Try it without a GPU
+### 1. Publish the portal
+Push this folder to a GitHub repository. Then go to **Settings → Pages → Build and deployment**, choose **Deploy from a branch**, and select `main` and `/docs`. The site appears at `https://<user>.github.io/<repo>/`.
+
+To preview locally, run `cd docs && python -m http.server 8080` and open http://localhost:8080. (Opening `index.html` directly from disk does not work, because the page loads `models.json` over HTTP.)
+
+### 2. Try it without a GPU
 Open **Connect → Demo**. This generates synthetic outputs in the browser so you can explore every viewer. The results are clearly labelled as synthetic.
 
 To exercise the real API end to end without weights, run the server in mock mode:
@@ -36,7 +43,7 @@ MOCK=1 bash start_server.sh          # Windows: .\start_server.ps1 -Mock
 python tests/test_api_mock.py        # runs every model × task (95 runs) plus the weights/hardware API
 ```
 
-### 2. Run real models
+### 3. Run real models
 ```bash
 cd backend
 pip install -r requirements.txt                        # install torch/torchvision for your CUDA first
@@ -158,4 +165,4 @@ Where a source is silent, the registry says so in `notes`. For example, PLIP and
 3. Otherwise, add a module under `backend/runners/` that returns `{"summary": [...], "panels": [...]}` using the existing panel types (`scatter`, `matrix`, `bars`, `spatial`, `channels`, `vector`, `table`, `image`, `note`), and register it in `runners/__init__.py`.
 
 ## Licence and use
-Copyright @Prajwal Ghimire. MIT License for portal code. Each model keeps its own license, and most are **non-commercial** (CC-BY-NC-ND-4.0 and similar). TRIDENT itself is CC-BY-NC-ND-4.0. For research use only; not for clinical decision-making.
+This portal's code is yours to licence. Each model keeps its own licence, and most are **non-commercial** (CC-BY-NC-ND-4.0 and similar). TRIDENT itself is CC-BY-NC-ND-4.0. For research use only; not for clinical decision-making.
