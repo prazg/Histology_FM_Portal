@@ -550,8 +550,8 @@
         h("div", { class: "hw-specs" }, h("span", { text: gpuTxt }),
           b && b.cores ? h("span", { text: `${b.cores} CPU threads` }) : null,
           b && b.memGB ? h("span", { text: `≥ ${b.memGB} GB memory (browser-rounded)` }) : null,
-          h("button", { class: "btn small", onclick: () => findServer(false) }, "Look for a server on this computer"),
-          h("button", { class: "btn ghost small", onclick: () => go("connect") }, "How to start one")),
+          h("button", { class: "btn small", onclick: () => window.Wizard && Wizard.open() }, "Set up a server on this computer"),
+          h("button", { class: "btn ghost small", onclick: () => findServer(false) }, "I already have one running")),
         h("p", { class: "small muted", style: "margin:6px 0 0", text: b && b.kind === "nvidia"
           ? "An NVIDIA GPU is visible, so a server on this computer can use CUDA. GPU memory and CUDA can only be checked by the server — connect one for exact advice."
           : "The badges on each model assume the server runs on this computer. Connect a server for exact GPU-memory checks." }));
@@ -706,6 +706,8 @@
     const draw = () => {
       box.dataset.tab = cur;
       box.replaceChildren(h("h3", { text: "Start the server" }),
+        h("p", { class: "small" }, "New here? ", h("button", { class: "btn small", type: "button", onclick: () => window.Wizard && Wizard.open() }, "Open guided setup"),
+          " walks you through installing and connecting a server, one step at a time."),
         h("p", { class: "small muted", text: os !== "Unknown" ? `Your browser reports ${os}.` : "" }),
         h("div", { class: "seg-ctl", role: "group", "aria-label": "Platform" }, tabs.map(([k, l]) => h("button", { type: "button", "aria-pressed": String(k === cur), onclick: () => { cur = k; draw(); } }, l))),
         h("pre", { class: "cli", text: cmd[cur] }), h("p", { class: "small", style: "margin-top:8px", text: note[cur] }),
@@ -728,9 +730,22 @@
     renderCounts(); renderFamilies(); fillModelSelect();
     renderHwBar();
     HW.detectBrowser().then(b => { S.bhw = b; renderHwBar(); renderRack(); if (S.run.model && !$("#view-run").hidden) renderAside(S.run.model, S.run.task); if (!$("#view-connect").hidden) renderLaunch(); });
+    // Arriving from the installer: #setup&url=…&key=… (the fragment never leaves the browser)
+    let wizardFrom = null;
+    if (location.hash.startsWith("#setup")) {
+      const q = new URLSearchParams(location.hash.slice(1).replace(/^setup&?/, ""));
+      if (q.get("url")) { S.conn.url = q.get("url"); store.set("fm.url", S.conn.url); }
+      if (q.get("key")) { S.conn.key = q.get("key"); store.set("fm.key", S.conn.key); }
+      S.conn.mode = "server"; store.set("fm.mode", "server");
+      history.replaceState(null, "", location.pathname + location.search + "#models");
+      wizardFrom = "installer";
+    }
     await autoConnect();
     renderRack();
     window.addEventListener("hashchange", route);
     route();
+    window.Portal = { S, api, connect, go, fitFor, refreshWeights, setPill, renderHwBar, renderRack, renderWeightsCard, store,
+      findServer, base, onLocalhost };
+    window.dispatchEvent(new CustomEvent("portal-ready", { detail: { wizardFrom } }));
   })();
 })();

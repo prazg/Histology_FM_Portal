@@ -312,3 +312,39 @@ footer { max-width: 1320px; margin: 0 auto; padding: 20px 24px 40px; color: var(
 @media (max-width: 640px) { .hw-specs .btn:first-of-type { margin-left: 0; } }
 table.data .dot { display: inline-block; vertical-align: middle; }
 .slide dd .badge { padding: 3px 6px; }
+
+/* ── setup wizard ───────────────────────────────────────────────────────── */
+dialog.wizard { width: min(960px, 96vw); max-height: min(760px, 94vh); padding: 0; border: 1px solid var(--line); border-radius: var(--radius-m);
+  background: var(--paper); color: var(--ink); box-shadow: 0 30px 80px -30px rgba(0,0,0,.45); overflow: hidden; }
+dialog.wizard::backdrop { background: color-mix(in srgb, var(--ink) 40%, transparent); }
+.wz { display: grid; grid-template-columns: 230px minmax(0, 1fr); height: min(760px, 94vh); }
+.wz-rail { background: var(--glass); border-right: 1px solid var(--line); padding: 18px 12px; overflow: auto; }
+.wz-brand { font-family: var(--font-display); font-weight: 700; display: flex; align-items: center; gap: 8px; margin: 0 6px 14px; }
+.wz-rail ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.wz-rail li button { width: 100%; display: flex; align-items: center; gap: 10px; border: 0; background: none; text-align: left;
+  padding: 7px 8px; border-radius: var(--radius-s); color: var(--ink-2); cursor: pointer; font-size: .92rem; }
+.wz-rail li button:disabled { color: var(--ink-3); cursor: default; }
+.wz-rail li.cur button { background: var(--paper); color: var(--ink); box-shadow: inset 3px 0 0 var(--eosin); }
+.wz-rail .n { width: 22px; height: 22px; flex: none; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--line);
+  font-size: .78rem; background: var(--paper); }
+.wz-rail li.done .n { background: var(--ok); border-color: var(--ok); color: #fff; }
+.wz-main { position: relative; padding: 26px 30px 20px; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+.wz-main h2 { padding-right: 40px; }
+.wz-main p { margin: 0; }
+.wz-list { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+.wz-choices { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.wz-cmd { display: flex; gap: 8px; align-items: flex-start; }
+.wz-cmd pre.cli { flex: 1; margin: 0; white-space: pre-wrap; word-break: break-all; }
+.wz-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.wz-row input { flex: 1; min-width: 220px; }
+.wz-checks { display: grid; gap: 6px; }
+.wz-access { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; max-height: 260px; overflow: auto; font-size: .92rem; }
+.wz-access .dot { display: inline-block; }
+.wz-nav { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+.wz-nav > :first-child { margin-right: auto; }
+.err-text { color: var(--err); }
+@media (max-width: 720px) {
+  .wz { grid-template-columns: 1fr; height: auto; max-height: 94vh; }
+  .wz-rail { display: none; }
+  .wz-main { padding: 20px 16px; }
+}
