@@ -12,6 +12,9 @@ from pathlib import Path
 
 os.environ["PORTAL_MOCK"] = "1"
 os.environ.setdefault("PORTAL_WORK_DIR", tempfile.mkdtemp(prefix="fmportal_"))
+os.environ["PORTAL_SETUP"] = "1"
+os.environ["PORTAL_SETUP_DRYRUN"] = "1"                       # log setup commands, don't run them
+os.environ["PORTAL_CONFIG"] = os.path.join(os.environ["PORTAL_WORK_DIR"], "config.yaml")   # never touch the real config
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
@@ -130,7 +133,36 @@ def test_hardware_weights_perf():
     assert isinstance(client.get("/api/perf").json(), dict)
 
 
+def test_setup_wizard_api():
+    st = client.get("/api/setup/status").json()
+    assert [x["id"] for x in st["steps"]] == ["torch", "trident", "gigatime", "hex", "stpath"]
+    assert "probe" in st and st["dry_run"] is True
+    r = client.post("/api/setup/run/torch").json()
+    assert r["step"] == "torch"
+    for _ in range(100):
+        t = client.get("/api/setup/task").json()
+        if t["status"] != "running":
+            break
+        time.sleep(0.05)
+    assert t["status"] == "done" and any("torch" in ln for ln in t["log"]), t
+    assert any("--torch-backend=auto" in ln or "pip install" in ln for ln in t["log"])
+    assert client.post("/api/setup/run/rm-rf").status_code == 404        # only fixed step ids
+    assert client.post("/api/setup/hf_token", json={"token": "nope"}).status_code == 400
+    assert client.post("/api/setup/hf_token", json={"token": "hf_dummy"}).json()["user"] == "dry-run-user"
+    d = tempfile.mkdtemp()
+    assert client.post("/api/setup/wsi_roots", json={"paths": [d]}).json()["wsi_roots"] == [str(Path(d).resolve())]
+    assert client.post("/api/setup/wsi_roots", json={"paths": ["/definitely/not/here"]}).status_code == 400
+    assert client.post("/api/setup/mode", json={"mock": True}).json()["mock"] is True
+    import yaml
+    cfg = yaml.safe_load(open(os.environ["PORTAL_CONFIG"]))
+    assert cfg["mock"] is True and cfg["allowed_wsi_roots"]
+    assert client.post("/api/setup/finish").json()["setup_enabled"] is False
+    assert client.get("/api/setup/status").status_code == 403            # locked after finishing
+    server.settings.setup_enabled = True                                # restore for other tests
+
+
 if __name__ == "__main__":
+    test_setup_wizard_api()
     test_hardware_weights_perf()
     test_health_and_models()
     test_all_models_all_tasks()
