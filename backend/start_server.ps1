@@ -8,7 +8,7 @@ Set-Location -Path $PSScriptRoot
 
 $check = @'
 import importlib.util as u, sys
-need = ["fastapi", "uvicorn", "yaml", "h5py", "huggingface_hub", "numpy", "PIL"]
+need = ["fastapi", "uvicorn", "yaml", "h5py", "huggingface_hub", "numpy", "PIL", "truststore"]
 missing = [m for m in need if u.find_spec(m) is None] + ([] if (u.find_spec("python_multipart") or u.find_spec("multipart")) else ["python-multipart"])
 sys.exit(1 if missing else 0)
 '@

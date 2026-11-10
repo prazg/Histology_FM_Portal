@@ -137,8 +137,9 @@ class WeightsManager:
                 self.state[mid] = {"status": "done", "message": "Weights are on this server.", "progress": 1.0}
             except Exception as e:
                 name = type(e).__name__
+                from jobs import friendly_hint
                 msg = ("No access: request it on the model's Hugging Face page, then log in on the server (hf auth login) "
-                       "or add your token under Connect." if "Gated" in name else f"{name}: {e}")
+                       "or add your token under Connect." if "Gated" in name else f"{name}: {e}{friendly_hint(e)}")
                 self.state[mid] = {"status": "error", "message": msg, "progress": 0.0}
 
     def _download(self, mid: str, token: Optional[str]):

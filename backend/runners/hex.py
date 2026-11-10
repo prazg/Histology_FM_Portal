@@ -16,6 +16,10 @@ import numpy as np
 from .common import batched, load_tiles, prepare_slide, save_thumbs
 
 _model = {}
+# Runs the HEX script as __main__ after switching HTTPS to the OS certificate store (see certs.py),
+# so MUSK weights can download behind a university/NHS proxy too.
+_BOOT = ("import sys, runpy\ntry:\n    import truststore; truststore.inject_into_ssl()\nexcept Exception:\n    pass\n"
+         "sys.argv = sys.argv[1:]\nrunpy.run_path(sys.argv[0], run_name='__main__')")
 
 
 def _paths(ctx):
@@ -101,7 +105,7 @@ def run_vmif_wsi(ctx) -> dict:
         out_h5 = ctx.scratch / "hex_pred.h5"
         env = os.environ.copy()
         env["PYTHONPATH"] = os.pathsep.join(extra + [env.get("PYTHONPATH", "")])
-        cmd = [sys.executable, str(ctx.settings.hex_repo / "hex" / "infer_slide_h5_nolan48.py"),
+        cmd = [sys.executable, "-c", _BOOT, str(ctx.settings.hex_repo / "hex" / "infer_slide_h5_nolan48.py"),
                "--wsi", ctx.inputs["wsi"], "--coord-h5", str(clam), "--checkpoint", str(ckpt),
                "--output-h5", str(out_h5), "--batch-size", str(int(ctx.params.get("batch_size", 32))), "--num-workers", "0"]
         ctx.progress(0.3, f"Running HEX on {n} patches ({footprint:.0f} µm footprint)")

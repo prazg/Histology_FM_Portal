@@ -11,6 +11,7 @@ Then open the portal and set "Backend URL" to http://127.0.0.1:8000.
 """
 from __future__ import annotations
 
+import certs  # noqa: F401  — must run before any HTTPS client is created (OS certificate store)
 import importlib.util
 import json
 import shutil
@@ -82,7 +83,8 @@ def health():
     return {"ok": True, "version": VERSION, "mock": settings.mock, "device": settings.resolved_device(),
             "cuda": cuda, "gpu": gpu, "packages": _mods(), "registry_version": registry.get("version"),
             "wsi_roots": [str(p) for p in settings.allowed_wsi_roots], "queue": manager.q.qsize(),
-            "hardware": hardware.detect(hf_cache_dir()), "hf_cache": hf_cache_dir(), "hf_logged_in": bool(token)}
+            "hardware": hardware.detect(hf_cache_dir()), "hf_cache": hf_cache_dir(), "hf_logged_in": bool(token),
+            "system_certs": certs.ACTIVE}
 
 
 # ── weights & measured performance ──────────────────────────────────────────

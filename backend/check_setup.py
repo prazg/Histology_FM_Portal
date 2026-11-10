@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import sys
 
+import certs
 from config import REGISTRY_PATH, load_settings
 import hardware
 from runners import runner_status
@@ -39,6 +40,8 @@ def main(short: bool = False) -> None:
     print(f"Torch {hw['torch'] or 'not installed'} · weights cache {hf_cache_dir()} ({hw.get('weights_disk_free_gb', '?')} GB free)")
     for w in hw["warnings"]:
         print(f"!     {w}")
+    print("HTTPS uses the " + ("operating-system certificate store (truststore)" if certs.ACTIVE else
+          "Python certificate bundle — on a university/NHS network run: pip install truststore"))
 
     models = [m for m in reg["models"] if m.get("runner")]
     status = {m["id"]: runner_status(m, s) for m in models}

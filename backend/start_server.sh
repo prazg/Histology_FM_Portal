@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 PY="${PYTHON:-python3}"; command -v "$PY" >/dev/null 2>&1 || PY=python
 "$PY" - <<'PY' || "$PY" -m pip install -r requirements-server.txt
 import importlib.util as u, sys
-need = ["fastapi", "uvicorn", "yaml", "h5py", "huggingface_hub", "numpy", "PIL"]
+need = ["fastapi", "uvicorn", "yaml", "h5py", "huggingface_hub", "numpy", "PIL", "truststore"]
 missing = [m for m in need if u.find_spec(m) is None] + ([] if (u.find_spec("python_multipart") or u.find_spec("multipart")) else ["python-multipart"])
 sys.exit(1 if missing else 0)
 PY

@@ -7,3 +7,4 @@ pillow
 pyyaml
 h5py
 huggingface_hub
+truststore              # HTTPS through university/NHS proxies: use the OS certificate store

@@ -112,6 +112,19 @@ def hf_token_env(token: Optional[str]):
             os.environ["HF_TOKEN"] = old
 
 
+def friendly_hint(e: Exception) -> str:
+    """Plain-language fixes for errors people hit on their first real run."""
+    msg = str(e)
+    if "CERTIFICATE_VERIFY_FAILED" in msg:
+        return ("  →  Your network's security proxy re-signs HTTPS. Run `pip install truststore` in the server's "
+                "environment and restart the server, so Python trusts the same certificates as your browser.")
+    if "GatedRepo" in type(e).__name__ or "403" in msg and "huggingface" in msg:
+        return "  →  No access to this gated model: request it on its Hugging Face page, then run `hf auth login` on the server."
+    if "CUDA out of memory" in msg or "OutOfMemoryError" in type(e).__name__:
+        return "  →  The GPU ran out of memory: lower the batch size, or use a smaller model / larger GPU."
+    return ""
+
+
 def _reset_peak(device: str) -> None:
     if device.startswith("cuda"):
         try:
@@ -236,7 +249,7 @@ class JobManager:
                 job.stage = "Finished"
             except Exception as e:  # surface the real error to the UI
                 job.status = "error"
-                job.error = f"{type(e).__name__}: {e}"
+                job.error = f"{type(e).__name__}: {e}" + friendly_hint(e)
                 ctx.log(traceback.format_exc())
             finally:
                 job.finished = time.time()
