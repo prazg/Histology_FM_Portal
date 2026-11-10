@@ -32,6 +32,9 @@ class Settings:
     hex_extra_pythonpath: List[Path] = field(default_factory=list)  # e.g. an openslide→tiffslide shim on Windows
     stpath_repo: Optional[Path] = None       # git clone https://github.com/Graph-and-Geometric-Learning/STPath
     stpath_weights: Optional[Path] = None    # stfm.pth (downloaded from HF tlhuang/STPath if unset)
+    # Guided setup: lets the portal's wizard install packages and edit this config — loopback requests only.
+    # The installer turns it on; the wizard's last step (or you) turns it off.
+    setup_enabled: bool = False
 
     def resolved_device(self) -> str:
         if self.device != "auto":
@@ -47,9 +50,26 @@ def _p(v) -> Optional[Path]:
     return Path(v).expanduser().resolve() if v not in (None, "") else None
 
 
+def config_path() -> Path:
+    return Path(os.environ.get("PORTAL_CONFIG", HERE / "config.yaml"))
+
+
+def update_config(changes: dict) -> Path:
+    """Merge `changes` into config.yaml (created if missing). Comments in the file are not preserved."""
+    import yaml
+    p = config_path()
+    data = (yaml.safe_load(p.read_text(encoding="utf-8")) or {}) if p.exists() else {}
+    for k, v in changes.items():
+        if not hasattr(Settings, k) and k not in Settings.__dataclass_fields__:
+            raise KeyError(k)
+        data[k] = [str(x) for x in v] if isinstance(v, (list, tuple)) else (str(v) if isinstance(v, Path) else v)
+    p.write_text("# Written by the Histology FM Portal setup. Safe to edit by hand.\n" + yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+    return p
+
+
 def load_settings() -> Settings:
     s = Settings()
-    cfg_path = Path(os.environ.get("PORTAL_CONFIG", HERE / "config.yaml"))
+    cfg_path = config_path()
     data = {}
     if cfg_path.exists():
         import yaml
@@ -62,6 +82,7 @@ def load_settings() -> Settings:
         "allowed_wsi_roots": os.environ.get("PORTAL_WSI_ROOTS"),
         "device": os.environ.get("PORTAL_DEVICE"),
         "mock": os.environ.get("PORTAL_MOCK"),
+        "setup_enabled": os.environ.get("PORTAL_SETUP"),
     }
     for k, v in env.items():
         if v not in (None, ""):
@@ -70,7 +91,7 @@ def load_settings() -> Settings:
     for k, v in data.items():
         if not hasattr(s, k):
             raise KeyError(f"Unknown setting {k!r} in {cfg_path}")
-        if k == "mock":
+        if k in ("mock", "setup_enabled"):
             v = str(v).lower() in ("1", "true", "yes")
         elif k in ("max_upload_mb",):
             v = int(v)

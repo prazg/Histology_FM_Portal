@@ -84,7 +84,13 @@ def health():
             "cuda": cuda, "gpu": gpu, "packages": _mods(), "registry_version": registry.get("version"),
             "wsi_roots": [str(p) for p in settings.allowed_wsi_roots], "queue": manager.q.qsize(),
             "hardware": hardware.detect(hf_cache_dir()), "hf_cache": hf_cache_dir(), "hf_logged_in": bool(token),
-            "system_certs": certs.ACTIVE}
+            "system_certs": certs.ACTIVE, "setup_enabled": settings.setup_enabled}
+
+
+# ── guided setup (wizard) ───────────────────────────────────────────────────
+from setup_api import make_router  # noqa: E402
+
+app.include_router(make_router(settings, require_key, weights))
 
 
 # ── weights & measured performance ──────────────────────────────────────────
