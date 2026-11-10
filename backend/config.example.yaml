@@ -4,7 +4,7 @@ work_dir: ./work                 # job inputs/outputs (can grow large; slides ar
 
 # Browser origins allowed to call this server. Add your GitHub Pages origin, e.g. https://prazneuro.github.io
 origins:
-  - "https://YOUR-GITHUB-USERNAME.github.io"
+  - "https://prazg.github.io"
   - "http://localhost:8080"
   - "http://127.0.0.1:8080"
 
