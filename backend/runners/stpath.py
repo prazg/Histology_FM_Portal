@@ -79,21 +79,14 @@ def run_st_wsi(ctx) -> dict:
             from huggingface_hub import hf_hub_download
             weights = hf_hub_download("tlhuang/STPath", "stfm.pth")
         if not ctx.device.startswith("cuda"):  # weights were saved on CUDA
-            _orig_load = torch.load
-        else:
-            _orig_load = None
-        try:
-            if _orig_load is not None:
-                torch.load = lambda *a, **k: _orig_load(*a, **{**k, "map_location": "cpu"})
-            from stpath.app.pipeline.inference import STPathInference
-            sym2ens = json.loads((repo / "utils_data" / "symbol2ensembl.json").read_text())
-            ctx.progress(0.8, f"STPath inference (organ={organ}, tech={tech})")
-            agent = STPathInference(gene_voc_path=str(repo / "utils_data" / "symbol2ensembl.json"),
-                                    model_weight_path=str(weights), device=0 if ctx.device.startswith("cuda") else "cpu")
-            ad = agent.inference(coords=centres.astype(np.float32).copy(), img_features=feats, organ_type=organ, tech_type=tech)
-        finally:
-            if _orig_load is not None:
-                torch.load = _orig_load
+            _load = torch.load
+            torch.load = lambda *a, **k: _load(*a, **{**k, "map_location": "cpu"})
+        from stpath.app.pipeline.inference import STPathInference
+        sym2ens = json.loads((repo / "utils_data" / "symbol2ensembl.json").read_text())
+        ctx.progress(0.8, f"STPath inference (organ={organ}, tech={tech})")
+        agent = STPathInference(gene_voc_path=str(repo / "utils_data" / "symbol2ensembl.json"),
+                                model_weight_path=str(weights), device=0 if ctx.device.startswith("cuda") else "cpu")
+        ad = agent.inference(coords=centres.astype(np.float32).copy(), img_features=feats, organ_type=organ, tech_type=tech)
         ad.write_h5ad(ctx.out_path("stpath_pred.h5ad"))
         ctx.register("stpath_pred.h5ad", f"AnnData {ad.n_obs} spots × {ad.n_vars} genes (log1p)")
         var = list(map(str, ad.var_names))

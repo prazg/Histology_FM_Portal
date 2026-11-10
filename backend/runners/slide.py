@@ -3,8 +3,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .common import MockImageEncoder, batched, cached_model, l2n, mock_text, prepare_slide, read_patches, slide_features, softmax
-from .patch import load_encoder
+from .common import MockImageEncoder, mock_text, prepare_slide, read_patches, batched, l2n, softmax
 from .zeroshot import parse_classes
 
 # Copied verbatim from TITAN titan/utils.py (TEMPLATES), used by the official zero-shot demo.
@@ -23,7 +22,10 @@ def _patch_feats(ctx, sp, penc_name, ps):
     if ctx.mock:
         enc = MockImageEncoder(penc_name, 256)
         return np.concatenate([enc(read_patches(sp, ch, ps)) for _, ch in batched(list(range(len(sp.coords))), 64)]), None
-    enc = load_encoder(ctx, penc_name)
+    from trident.patch_encoder_models import encoder_factory
+    from .common import slide_features
+    ctx.progress(0.2, f"Loading patch encoder {penc_name}")
+    enc = encoder_factory(penc_name).eval().to(ctx.device)
     return slide_features(ctx, sp, enc, penc_name, 0, ps)
 
 
@@ -83,8 +85,7 @@ def run_slide_zeroshot(ctx) -> dict:
         import h5py
         import torch
         from transformers import AutoModel
-        titan = cached_model(("titan_vl", ctx.device),
-                             lambda: AutoModel.from_pretrained("MahmoodLab/TITAN", trust_remote_code=True).to(ctx.device).eval())
+        titan = AutoModel.from_pretrained("MahmoodLab/TITAN", trust_remote_code=True).to(ctx.device).eval()
         with h5py.File(h5, "r") as f:
             features = torch.from_numpy(f["features"][:]).to(ctx.device)
             coords = torch.from_numpy(f["coords"][:]).to(ctx.device)

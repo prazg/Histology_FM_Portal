@@ -24,7 +24,6 @@ class Settings:
     device: str = "auto"              # "auto" | "cuda" | "cuda:1" | "cpu"
     mock: bool = False                # deterministic stand-ins, no weights (UI / wiring tests only)
     max_upload_mb: int = 4096
-    max_jobs_kept: int = 100          # maximum completed jobs retained on disk (0 = unlimited)
     # External repos / weights for runners TRIDENT does not cover.
     gigatime_repo: Optional[Path] = None     # git clone https://github.com/prov-gigatime/GigaTIME
     hex_repo: Optional[Path] = None          # lilab-stanford/HEX clone (contains hex/infer_slide_h5_nolan48.py)
@@ -73,7 +72,7 @@ def load_settings() -> Settings:
             raise KeyError(f"Unknown setting {k!r} in {cfg_path}")
         if k == "mock":
             v = str(v).lower() in ("1", "true", "yes")
-        elif k in ("max_upload_mb", "max_jobs_kept"):
+        elif k in ("max_upload_mb",):
             v = int(v)
         elif k in ("allowed_wsi_roots", "hex_extra_pythonpath"):
             v = [_p(x) for x in (v or [])]

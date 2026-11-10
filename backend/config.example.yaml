@@ -20,7 +20,6 @@ allowed_wsi_roots:
 device: auto                     # auto | cuda | cuda:1 | cpu
 mock: false                      # true = synthetic outputs, no weights (wiring tests only)
 max_upload_mb: 4096
-max_jobs_kept: 100               # prune oldest finished jobs beyond this count (0 = keep all)
 
 # ── Runners outside TRIDENT ───────────────────────────────────────────────────
 gigatime_repo: ./external/GigaTIME        # git clone https://github.com/prov-gigatime/GigaTIME

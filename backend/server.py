@@ -12,30 +12,28 @@ Then open the portal and set "Backend URL" to http://127.0.0.1:8000.
 from __future__ import annotations
 
 import importlib.util
-import io
 import json
 import shutil
 from pathlib import Path
 from typing import List, Optional
 
 import numpy as np
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, Response, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from PIL import Image
 
 from config import REGISTRY_PATH, load_settings
+import hardware
 from jobs import JobManager
 from runners import dispatch, runner_status
-from runners.common import active_model_key, clear_model_cache
+from weights import WeightsManager, hf_cache_dir
 
-WSI_EXTS = {".svs", ".ndpi", ".tif", ".tiff", ".mrxs", ".scn", ".czi", ".png", ".jpg", ".jpeg"}
-
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 settings = load_settings()
 registry = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
 MODELS = {m["id"]: m for m in registry["models"]}
 manager = JobManager(settings, registry, dispatch)
+weights = WeightsManager(registry, mock=settings.mock)
 
 app = FastAPI(title="Histology FM Portal backend", version=VERSION)
 app.add_middleware(
@@ -75,34 +73,40 @@ def health():
         gpu = torch.cuda.get_device_name(0) if cuda else None
     except ImportError:
         pass
+    token = None
+    try:
+        from huggingface_hub import get_token
+        token = get_token()
+    except Exception:
+        pass
     return {"ok": True, "version": VERSION, "mock": settings.mock, "device": settings.resolved_device(),
             "cuda": cuda, "gpu": gpu, "packages": _mods(), "registry_version": registry.get("version"),
             "wsi_roots": [str(p) for p in settings.allowed_wsi_roots], "queue": manager.q.qsize(),
-            "cached_model": active_model_key()}
+            "hardware": hardware.detect(hf_cache_dir()), "hf_cache": hf_cache_dir(), "hf_logged_in": bool(token)}
 
 
-@app.post("/api/cache/clear", dependencies=[Depends(require_key)])
-def clear_cache():
-    unloaded = clear_model_cache()
-    return {"cleared": True, "unloaded": unloaded}
+# ── weights & measured performance ──────────────────────────────────────────
+@app.get("/api/weights", dependencies=[Depends(require_key)])
+def weights_status():
+    return weights.all_status()
 
 
-@app.get("/api/wsi/browse", dependencies=[Depends(require_key)])
-def browse_wsi():
-    slides = []
-    for root in settings.allowed_wsi_roots:
-        if not root.exists():
-            continue
-        for p in sorted(root.rglob("*")):
-            if len(slides) >= 300:
-                break
-            try:
-                if p.is_file() and p.suffix.lower() in WSI_EXTS:
-                    slides.append({"path": str(p.resolve()), "name": p.name, "root": str(root),
-                                   "size_mb": round(p.stat().st_size / 1048576, 1)})
-            except OSError:
-                continue
-    return {"slides": slides}
+@app.post("/api/weights/{model_id}/download", dependencies=[Depends(require_key)])
+def weights_download(model_id: str, x_hf_token: Optional[str] = Header(default=None)):
+    if model_id not in MODELS:
+        raise HTTPException(404, f"Unknown model {model_id}")
+    return weights.enqueue(model_id, x_hf_token)
+
+
+@app.post("/api/weights/access", dependencies=[Depends(require_key)])
+def weights_access(x_hf_token: Optional[str] = Header(default=None)):
+    repos = sorted({(w["repo"], w.get("type", "model")) for m in MODELS.values() for w in m["weights"] if w["via"] == "hf"})
+    return weights.check_access(repos, x_hf_token)
+
+
+@app.get("/api/perf", dependencies=[Depends(require_key)])
+def perf():
+    return manager.perf.summary()
 
 
 @app.get("/api/models", dependencies=[Depends(require_key)])
@@ -193,27 +197,11 @@ def get_job(job_id: str):
     return _job(job_id).public()
 
 
-@app.post("/api/jobs/{job_id}/cancel", dependencies=[Depends(require_key)])
-def cancel_job(job_id: str):
-    job = _job(job_id)
-    if job.status in ("done", "error", "cancelled"):
-        return {"id": job_id, "status": job.status}
-    job.cancel_requested = True
-    if job.status == "queued":
-        job.status = "cancelled"
-        job.stage = "Cancelled"
-        job.persist()
-    else:
-        job.stage = "Cancelling…"
-    return {"id": job_id, "status": job.status}
-
-
 @app.delete("/api/jobs/{job_id}", dependencies=[Depends(require_key)])
 def delete_job(job_id: str):
     job = _job(job_id)
     if job.status == "running":
-        job.cancel_requested = True
-        raise HTTPException(409, "Cancel requested; the job can be removed once the current step stops.")
+        raise HTTPException(409, "The job is running; it can be removed when it finishes.")
     job.status = "cancelled"
     manager.jobs.pop(job_id, None)
     shutil.rmtree(job.dir, ignore_errors=True)
@@ -250,39 +238,3 @@ def get_channel(job_id: str, panel: str, channel: int):
     return {"values": np.round(v, 5).tolist(),
             "min": float(finite.min()) if finite.size else 0.0,
             "max": float(finite.max()) if finite.size else 1.0}
-
-
-@app.get("/api/jobs/{job_id}/patch", dependencies=[Depends(_key_q)])
-def get_patch_crop(job_id: str, x: int, y: int, size: int = 256):
-    """Return a high-resolution JPEG crop of a level-0 patch (or fallback to thumbnail crop)."""
-    job = _job(job_id)
-    size = max(16, min(size, 2048))
-    wsi_path = (job.inputs or {}).get("wsi")
-    im = None
-    if wsi_path and Path(wsi_path).is_file():
-        if settings.mock:
-            try:
-                full = Image.open(wsi_path).convert("RGB")
-                im = full.crop((x, y, x + size, y + size)).resize((224, 224), Image.BILINEAR)
-            except Exception:
-                im = None
-        else:
-            try:
-                from trident import load_wsi
-                slide = load_wsi(slide_path=wsi_path, lazy_init=False)
-                im = slide.read_region((int(x), int(y)), 0, (int(size), int(size))).convert("RGB").resize((224, 224), Image.BILINEAR)
-            except Exception:
-                im = None
-    if im is None:
-        thumb_p = _out_file(job_id, "thumb.jpg")
-        scale = 1.0
-        for p in (job.result or {}).get("panels") or []:
-            if p.get("type") == "spatial":
-                scale = float(p.get("scale") or 1.0)
-                break
-        th = Image.open(thumb_p).convert("RGB")
-        tx, ty, ts = int(round(x * scale)), int(round(y * scale)), max(8, int(round(size * scale)))
-        im = th.crop((tx, ty, tx + ts, ty + ts)).resize((224, 224), Image.NEAREST)
-    buf = io.BytesIO()
-    im.save(buf, format="JPEG", quality=88)
-    return Response(content=buf.getvalue(), media_type="image/jpeg")

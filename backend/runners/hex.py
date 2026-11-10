@@ -13,7 +13,9 @@ from pathlib import Path
 
 import numpy as np
 
-from .common import batched, cached_model, load_tiles, prepare_slide, save_thumbs
+from .common import batched, load_tiles, prepare_slide, save_thumbs
+
+_model = {}
 
 
 def _paths(ctx):
@@ -48,8 +50,7 @@ def run_vmif_tiles(ctx) -> dict:
         for p in extra:
             if p not in sys.path:
                 sys.path.insert(0, p)
-
-        def _build():
+        if "m" not in _model:
             from musk import modeling  # noqa: F401 — registers MUSK with timm
             from hex_architecture import CustomModel
             ctx.progress(0.05, "Loading HEX (MUSK backbone needs access to xiangjx/musk)")
@@ -57,9 +58,8 @@ def run_vmif_tiles(ctx) -> dict:
             res = m.load_state_dict(torch.load(ckpt, map_location="cpu"), strict=False)
             ctx.log(f"load_state_dict: missing={len(res.missing_keys)} unexpected={len(res.unexpected_keys)} "
                     "(missing frozen MUSK layers are expected; unexpected should be 0)")
-            return m.eval().to(ctx.device)
-
-        model = cached_model(("hex_nolan48", ctx.device), _build)
+            _model["m"] = m.eval().to(ctx.device)
+        model = _model["m"]
         tf = transforms.Compose([transforms.Resize((384, 384)), transforms.ToTensor(),
                                  transforms.Normalize(mean=IMAGENET_INCEPTION_MEAN, std=IMAGENET_INCEPTION_STD)])
         out = []

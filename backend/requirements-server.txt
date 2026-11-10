@@ -1,0 +1,9 @@
+# Lightweight server packages (enough for mock mode and the weights manager)
+fastapi>=0.110
+uvicorn[standard]
+python-multipart
+numpy
+pillow
+pyyaml
+h5py
+huggingface_hub

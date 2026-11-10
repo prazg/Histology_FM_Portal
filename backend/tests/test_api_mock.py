@@ -68,12 +68,6 @@ def check_result(job):
         if p["type"] == "spatial":
             v = client.get(f"/api/jobs/{job['id']}/spatial/{p['id']}/0").json()
             assert len(v["values"]) == len(p["coords"])
-            gj = [f["name"] for f in res["files"] if f["name"] == f"qupath_{p['id']}.geojson"]
-            assert gj, "Expected QuPath GeoJSON export for spatial panel"
-            if p["coords"]:
-                x0, y0 = p["coords"][0]
-                pr = client.get(f"/api/jobs/{job['id']}/patch?x={x0}&y={y0}&size={int(p['patch'])}")
-                assert pr.status_code == 200 and pr.headers["content-type"] == "image/jpeg"
         if p["type"] == "image":
             assert client.get(f"/api/jobs/{job['id']}/files/{p['src']}").status_code == 200
     for f in res["files"]:
@@ -110,11 +104,34 @@ def test_rejects_bad_requests():
     assert client.post("/api/jobs", data={"model_id": "uni_v1", "task": "embed_tiles"}).status_code == 400
     r = client.post("/api/jobs", data={"model_id": "uni_v1", "task": "embed_wsi", "wsi_path": "/etc/passwd"})
     assert r.status_code in (400, 403)
-    assert client.post("/api/cache/clear").json()["cleared"] is True
-    assert "slides" in client.get("/api/wsi/browse").json()
+
+
+def test_hardware_weights_perf():
+    h = client.get("/api/health").json()
+    hw = h["hardware"]
+    assert hw["cpu_cores"] and "gpus" in hw and "warnings" in hw
+    w = client.get("/api/weights").json()
+    assert w["uni_v1"]["overall"] == "missing" and w["uni_v1"]["missing_gb"] > 1
+    assert w["slide:chief"]["overall"] == "manual"
+    assert w["seg:otsu"]["overall"] == "none"
+    # slide encoders include their patch encoder's weights
+    assert {p["model"] for p in w["slide:titan"]["parts"]} == {"slide:titan", "conch_v15"}
+    acc = client.post("/api/weights/access").json()
+    assert acc and all(v == "ok" for v in acc.values())
+    assert client.post("/api/weights/stpath/download").status_code == 200
+    for _ in range(100):
+        st = client.get("/api/weights").json()["stpath"]
+        if st["download"] == "done":
+            break
+        time.sleep(0.1)
+    assert st["overall"] == "cached", st
+    assert client.get("/api/weights").json()["gigapath"]["overall"] == "cached"   # shared component
+    assert client.post("/api/weights/nope/download").status_code == 404
+    assert isinstance(client.get("/api/perf").json(), dict)
 
 
 if __name__ == "__main__":
+    test_hardware_weights_perf()
     test_health_and_models()
     test_all_models_all_tasks()
     test_rejects_bad_requests()
