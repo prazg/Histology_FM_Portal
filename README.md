@@ -28,16 +28,7 @@ GitHub Pages cannot run Python or a GPU, so the page itself never runs a model. 
 
 ## Quick start
 
-### 1. Publish the portal
-Push this folder to a GitHub repository. Either:
-- **GitHub Actions (automatic):** `.github/workflows/pages.yml` deploys `docs/` automatically when you set **Settings → Pages → Build and deployment → Source: GitHub Actions**; or
-- **Branch deploy:** choose **Deploy from a branch** and select `main` and `/docs` (`docs/.nojekyll` is included).
-
-The site appears at `https://<user>.github.io/<repo>/`.
-
-To preview locally, run `cd docs && python -m http.server 8080` and open http://localhost:8080. (Opening `index.html` directly from disk does not work, because the page loads `models.json` over HTTP.)
-
-### 2. Try it without a GPU
+### 1. Try it without a GPU
 Open **Connect → Demo**. This generates synthetic outputs in the browser so you can explore every viewer. The results are clearly labelled as synthetic.
 
 To exercise the real API end to end without weights, run the server in mock mode:
@@ -47,7 +38,7 @@ MOCK=1 bash start_server.sh          # Windows: .\start_server.ps1 -Mock
 python tests/test_api_mock.py        # runs every model × task (104 runs) plus the weights/hardware API
 ```
 
-### 3. Run real models
+### 2. Run real models
 ```bash
 cd backend
 pip install -r requirements.txt                        # install torch/torchvision for your CUDA first
@@ -176,4 +167,6 @@ Where a source is silent, the registry says so in `notes`. For example, PLIP and
 3. Otherwise, add a module under `backend/runners/` that returns `{"summary": [...], "panels": [...]}` using the existing panel types (`scatter`, `matrix`, `bars`, `spatial`, `channels`, `vector`, `table`, `image`, `note`), and register it in `runners/__init__.py`.
 
 ## Licence and use
-This portal's code is yours to licence. Each model keeps its own licence, and most are **non-commercial** (CC-BY-NC-ND-4.0 and similar). TRIDENT itself is CC-BY-NC-ND-4.0. For research use only; not for clinical decision-making.
+Created and curated by Prajwal Ghimire. 
+CopyRight @Prajwal Ghimire
+Each model keeps its own licence, and most are **non-commercial** (CC-BY-NC-ND-4.0 and similar). TRIDENT itself is CC-BY-NC-ND-4.0. For research use only; not for clinical decision-making.
