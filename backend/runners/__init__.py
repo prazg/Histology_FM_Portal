@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 
-from . import gigatime, hex, patch, segment, slide, stpath, zeroshot
+from . import gigatime, hex, patch, segment, slide, stpath, tox_vlm, zeroshot
 
 TASKS = {
     "embed_tiles": lambda ctx: patch.run_embed_tiles(ctx),
@@ -14,6 +14,7 @@ TASKS = {
     "slide_zeroshot": lambda ctx: slide.run_slide_zeroshot(ctx),
     "segment_wsi": lambda ctx: segment.run_segment_wsi(ctx),
     "st_wsi": lambda ctx: stpath.run_st_wsi(ctx),
+    "tox_vqa": lambda ctx: tox_vlm.run_tox_vqa(ctx),
 }
 VMIF = {"gigatime": gigatime, "hex": hex}
 
@@ -39,7 +40,7 @@ INSTALL_HINT = {
 }
 
 VL_DEPS = {"conch": ["conch"], "musk": ["musk", "transformers"], "keep": ["transformers"],
-           "plip": ["transformers"], "quiltnet": ["open_clip"]}
+           "plip": ["transformers"], "quiltnet": ["open_clip"], "loki": ["open_clip"]}
 
 
 def runner_status(model: dict, settings) -> dict:
@@ -67,6 +68,14 @@ def runner_status(model: dict, settings) -> dict:
         need.append("timm")
         if not (settings.stpath_repo and (settings.stpath_repo / "utils_data" / "symbol2ensembl.json").exists()):
             reason.append("set stpath_repo")
+    if runner == "deepspotm":
+        if not (settings.deepspotm_repo and settings.deepspotm_repo.exists()):
+            reason.append("set deepspotm_repo (clone ratschlab/DeepSpotM)")
+    if runner == "tisam":
+        if not (settings.tisam_repo and settings.tisam_repo.exists()):
+            reason.append("set tisam_repo (clone Kiemen-Lab/tisam)")
+    if runner == "tox_vlm" and not settings.vllm_url:
+        need.append("transformers")
     if model.get("trident_name") == "titan" or "slide_zeroshot" in model.get("tasks", []):
         need.append("transformers")
     missing = _has(*dict.fromkeys(need))

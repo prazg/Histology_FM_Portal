@@ -1,25 +1,25 @@
 # Histology FM Portal
 
-A graphical front end for open-weight histology foundation models. It is a static site that can be hosted on GitHub Pages (`docs/`), plus a small FastAPI inference server (`backend/`) that you run on a GPU machine.
+A graphical front end for **55 open-weight clinical and preclinical histology foundation models** — with verified paper links, one-click BibTeX citations, species/scope filtering (human clinical, multi-species & veterinary, and rodent toxicologic pathology), and interactive result viewers. It is a static site that can be hosted on GitHub Pages (`docs/`), plus a small FastAPI inference server (`backend/`) that you run on a GPU machine.
 
 Choose a model, give it tiles or a whole slide, and the portal returns outputs that match the model type:
 
 | Model family | Outputs in the portal |
 |---|---|
-| Patch encoders (UNI, Virchow2, Prov-GigaPath, H-optimus, Phikon, Kaiko, …) | Embeddings (.h5); PCA scatter coloured by k-means cluster; cosine-similarity matrix. On a slide: spatial cluster map and a PCA-as-RGB map |
-| Vision–language (CONCH, MUSK, KEEP, PLIP, QuiltNet) | Zero-shot classification from your own prompts: per-tile probabilities, per-class heatmaps over the slide, slide-level scores |
-| Slide encoders (TITAN, PRISM, CHIEF, GigaPath slide, MADELEINE, FEATHER, CARE) | One embedding per slide; TITAN also does slide-level zero-shot classification |
+| Patch encoders (UNI, UNI2-h, Virchow2, Prov-GigaPath, H-optimus, Phikon, Hibou-L/B, Kaiko, …) | Embeddings (.h5); PCA scatter coloured by k-means cluster; cosine-similarity matrix. On a slide: spatial cluster map and a PCA-as-RGB map |
+| Vision–language & Toxicologic QA (CONCH, MUSK, KEEP, PLIP, QuiltNet, Loki/OmiCLIP, TissueDecision-9B) | Zero-shot classification from your own prompts (or preclinical toxicologic presets); structured rodent toxicologic VLM decisions & rationales (`TissueDecision-9B`); per-class slide heatmaps |
+| Slide encoders (TITAN, PRISM, PRISM2, CHIEF, GigaPath slide, MADELEINE, FEATHER, CARE) | One embedding per slide; TITAN also does slide-level zero-shot classification |
 | Virtual multiplex (GigaTIME 23-ch, HEX 48-marker) | Marker maps per tile; per-marker spatial maps over the slide; marker summary tables |
-| Spatial transcriptomics (STPath) | Predicted log1p expression per spot (.h5ad) and gene maps |
-| Tissue segmentation (HEST, GrandQC, Otsu) | Contour overlay; GeoJSON that opens in QuPath |
+| Spatial transcriptomics (STPath human pan-organ, DeepSpot-M mouse) | Predicted log1p expression per spot (.h5ad / .csv) and interactive spatial gene maps for human HGNC or mouse MGI symbols |
+| Tissue & mouse anatomy segmentation (HEST, GrandQC, TiSAM MegaMouse, Otsu) | Contour overlay; 52-class mouse anatomical compartment breakdown (`TiSAM`); GeoJSON that opens in QuPath |
 
 ```
 GitHub Pages (docs/)  ──HTTPS/localhost──▶  backend/server.py (your GPU)
-  catalogue, forms,                            TRIDENT: WSI reading, segmentation,
-  result viewers                               patching, 33 patch + slide encoders
-  (no images leave                             + runners: CONCH/MUSK/KEEP/PLIP/QuiltNet
-   your network)                               zero-shot, TITAN zero-shot, GigaTIME,
-                                               HEX, STPath
+  55-model catalogue,                          TRIDENT: WSI reading, segmentation,
+  species filter, Papers                       patching, patch + slide encoders
+  & BibTeX tab, viewers                        + runners: CONCH/MUSK/KEEP/PLIP/QuiltNet/Loki
+  (no images leave                             zero-shot, TissueDecision-9B tox VLM, TITAN,
+   your network)                               GigaTIME, HEX, STPath, DeepSpot-M, TiSAM
 ```
 
 GitHub Pages cannot run Python or a GPU, so the page itself never runs a model. Images and slides go only from your browser to *your* server.
@@ -28,17 +28,26 @@ GitHub Pages cannot run Python or a GPU, so the page itself never runs a model. 
 
 ## Quick start
 
-### 1. Try it without a GPU
+### 1. Publish the portal
+Push this folder to a GitHub repository. Either:
+- **GitHub Actions (automatic):** `.github/workflows/pages.yml` deploys `docs/` automatically when you set **Settings → Pages → Build and deployment → Source: GitHub Actions**; or
+- **Branch deploy:** choose **Deploy from a branch** and select `main` and `/docs` (`docs/.nojekyll` is included).
+
+The site appears at `https://<user>.github.io/<repo>/`.
+
+To preview locally, run `cd docs && python -m http.server 8080` and open http://localhost:8080. (Opening `index.html` directly from disk does not work, because the page loads `models.json` over HTTP.)
+
+### 2. Try it without a GPU
 Open **Connect → Demo**. This generates synthetic outputs in the browser so you can explore every viewer. The results are clearly labelled as synthetic.
 
 To exercise the real API end to end without weights, run the server in mock mode:
 ```bash
 cd backend
 MOCK=1 bash start_server.sh          # Windows: .\start_server.ps1 -Mock
-python tests/test_api_mock.py        # runs every model × task (95 runs) plus the weights/hardware API
+python tests/test_api_mock.py        # runs every model × task (104 runs) plus the weights/hardware API
 ```
 
-### 2. Run real models
+### 3. Run real models
 ```bash
 cd backend
 pip install -r requirements.txt                        # install torch/torchvision for your CUDA first
@@ -50,6 +59,8 @@ pip install git+https://github.com/Mahmoodlab/CONCH.git                      # C
 git clone https://github.com/prov-gigatime/GigaTIME external/GigaTIME        # GigaTIME
 git clone https://github.com/lilab-stanford/HEX external/HEX                 # HEX (+ MUSK package)
 git clone https://github.com/Graph-and-Geometric-Learning/STPath external/STPath
+git clone https://github.com/ratschlab/DeepSpotM external/DeepSpotM          # Mouse spatial transcriptomics
+git clone https://github.com/Kiemen-Lab/tisam external/tisam                 # MegaMouse 52-class mouse segmentation
 cp config.example.yaml config.yaml                     # set origins, portal_key, slide folders, repo paths
 hf auth login                                          # once; accept each gated model's terms on its HF page first
 python check_setup.py                                  # hardware, what's missing, which models suit this machine
@@ -121,7 +132,8 @@ Where a source is silent, the registry says so in `notes`. For example, PLIP and
 | Patch encoders | OpenMidnight | `openmidnight` | 1536-d | Apache-2.0 | yes | Embed tiles, Embed a slide |
 | Patch encoders | GPFM | `gpfm` | 1024-d | MIT | no | Embed tiles, Embed a slide |
 | Patch encoders | GenBio-PathFM | `genbio-pathfm` | 4608-d | GenBio AI Community | no | Embed tiles, Embed a slide |
-| Patch encoders | Hibou-L | `hibou_l` | 1024-d | Apache-2.0 | yes | Embed tiles, Embed a slide |
+| Patch encoders | Hibou-L | `hibou_l` | 1024-d | Apache-2.0 | no | Embed tiles, Embed a slide |
+| Patch encoders | Hibou-B | `hibou_b` | 768-d | Apache-2.0 | no | Embed tiles, Embed a slide |
 | Patch encoders | Phaet | `phaet` | 1024-d | Waiv non-commercial | yes | Embed tiles, Embed a slide |
 | Patch encoders | Mascaret | `mascaret` | 1536 / 3072-d | Waiv non-commercial | yes | Embed tiles, Embed a slide |
 | Patch encoders | Lunit DINO ViT-S/8 | `lunit-vits8` | 384-d | Lunit non-commercial | no | Embed tiles, Embed a slide |
@@ -137,6 +149,8 @@ Where a source is silent, the registry says so in `notes`. For example, PLIP and
 | Vision–language | KEEP | `keep` | 768-d | MIT | no | Zero-shot classify tiles, Zero-shot map a slide, Embed tiles, Embed a slide |
 | Vision–language | PLIP | `plip` | 512-d | Not stated on model card | no | Zero-shot classify tiles, Zero-shot map a slide, Embed tiles, Embed a slide |
 | Vision–language | QuiltNet-B-32 | `quiltnet_b32` | 512-d | MIT | no | Zero-shot classify tiles, Zero-shot map a slide, Embed tiles, Embed a slide |
+| Vision–language | Loki (OmiCLIP) | `loki` | 768-d | Apache-2.0 / Academic | no | Zero-shot classify tiles, Zero-shot map a slide, Embed tiles, Embed a slide |
+| Vision–language | TissueDecision-9B | `tissuedecision_9b` | Rodent ToxPath VLM | CC-BY-SA-4.0 | no | Toxicologic / VLM decision QA |
 | Slide encoders | TITAN | `slide:titan` | — | CC-BY-NC-ND-4.0 | yes | Slide embedding, Zero-shot classify a slide |
 | Slide encoders | PRISM | `slide:prism` | — | CC-BY-NC-ND-4.0 | yes | Slide embedding |
 | Slide encoders | PRISM2 | `slide:prism2` | — | CC-BY-NC-ND-4.0 | yes | Slide embedding |
@@ -151,8 +165,10 @@ Where a source is silent, the registry says so in `notes`. For example, PLIP and
 | Virtual multiplex | GigaTIME-Flash | `gigatime-flash` | 23 markers | Apache-2.0 (GitHub) | yes | catalogue only |
 | Virtual multiplex | HEX (nolan48) | `hex_nolan48` | 48 markers | CC-BY-NC-ND-4.0 | no | Virtual multiplex on tiles, Virtual multiplex on a slide |
 | Spatial transcriptomics | STPath | `stpath` | — | Not stated on model card | no | Predict spatial expression |
+| Spatial transcriptomics | DeepSpot-M (Mouse ST) | `deepspot_m` | Mouse MGI genes | MIT | no | Predict spatial expression |
 | Tissue segmentation | HEST tissue segmenter | `seg:hest` | — | CC-BY-NC-SA-4.0 | no | Segment tissue |
 | Tissue segmentation | GrandQC tissue segmenter | `seg:grandqc` | — | CC-BY-NC-SA-4.0 | no | Segment tissue |
+| Tissue segmentation | TiSAM (MegaMouse) | `tisam_megamouse` | 52 mouse classes | Apache-2.0 / Academic | no | Segment tissue |
 | Tissue segmentation | Otsu threshold | `seg:otsu` | — | No weights | no | Segment tissue |
 ## Adding a model
 1. Add an entry to `docs/models.json` with `id`, `category`, `runner`, `tasks` and licence fields. The portal picks it up automatically.
@@ -161,8 +177,3 @@ Where a source is silent, the registry says so in `notes`. For example, PLIP and
 
 ## Licence and use
 This portal's code is yours to licence. Each model keeps its own licence, and most are **non-commercial** (CC-BY-NC-ND-4.0 and similar). TRIDENT itself is CC-BY-NC-ND-4.0. For research use only; not for clinical decision-making.
-
-## Build
-Built, created and curated by Prajwal Ghimire
-CopyRight @Prajwal Ghimire
-Contact: prajwal.ghimire@crick.ac.uk

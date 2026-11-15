@@ -15,6 +15,8 @@ from .common import MockImageEncoder, batched, prepare_slide
 
 DEFAULT_GENES = ["GFAP", "SOX2", "OLIG2", "EGFR", "CD44", "CHI3L1", "VIM", "MKI67", "PTPRC", "CD68", "CD163",
                  "AIF1", "CD3E", "CD8A", "PECAM1", "VEGFA", "COL1A1", "COL4A1", "FN1", "POSTN"]
+DEFAULT_MOUSE_GENES = ["Alb", "Cyp2e1", "Glul", "Ass1", "Pecam1", "Col1a1", "Ptprc", "Adgre1", "Acta2", "Mki67",
+                       "Havcr1", "Lcn2", "Slc34a1", "Sftpc", "Gfap", "Sox2"]
 
 
 def _spots(ctx, sp, spot_um):
@@ -49,8 +51,21 @@ def _gigapath_feats(ctx, sp, centres, side0):
     return np.concatenate(out)
 
 
+def _uni_feats(ctx, sp, centres, side0):
+    imgs_at = lambda idx: [sp.slide.read_region((int(centres[i][0] - side0 / 2), int(centres[i][1] - side0 / 2)), 0,
+                                                (side0, side0)).convert("RGB").resize((224, 224), Image.BICUBIC) for i in idx]
+    n = len(centres)
+    if ctx.mock:
+        enc = MockImageEncoder("uni_v1", 1024)
+        return np.concatenate([enc(imgs_at(ch)) for _, ch in batched(list(range(n)), 64)])
+    from .patch import encode_tiles, load_encoder
+    enc = load_encoder(ctx, "uni_v1")
+    return encode_tiles(ctx, enc, imgs_at(list(range(n))), bs=64)
+
+
 def run_st_wsi(ctx) -> dict:
     p = ctx.params
+    is_mouse = ctx.model.get("runner") == "deepspotm"
     pitch_um = float(p.get("pitch_um", 100.0))
     spot_um = float(p.get("spot_um", 55.0))
     mag = 20
@@ -58,16 +73,38 @@ def run_st_wsi(ctx) -> dict:
                        max_patches=int(p.get("max_spots", 3000)) or None)
     centres, side0 = _spots(ctx, sp, spot_um)
     ctx.log(f"{len(centres)} spots · pitch {pitch_um} µm · spot {spot_um} µm ({side0} level-0 px)")
-    feats = _gigapath_feats(ctx, sp, centres, side0)
-    genes = [g.strip() for g in (p.get("genes") or ",".join(DEFAULT_GENES)).replace("\n", ",").split(",") if g.strip()]
-    organ = p.get("organ") or None
-    tech = p.get("tech") or None
+    feats = _uni_feats(ctx, sp, centres, side0) if is_mouse else _gigapath_feats(ctx, sp, centres, side0)
+    def_genes = DEFAULT_MOUSE_GENES if is_mouse else DEFAULT_GENES
+    raw_genes = (p.get("genes") or "").strip()
+    if is_mouse and raw_genes.replace(" ", "") == ",".join(DEFAULT_GENES):
+        raw_genes = ""  # swap human UI default to mouse MGI symbols when DeepSpot-M is selected
+    genes = [g.strip() for g in (raw_genes or ",".join(def_genes)).replace("\n", ",").split(",") if g.strip()]
+    organ = p.get("organ") or ("Mouse tissue" if is_mouse else None)
+    tech = p.get("tech") or ("Visium" if is_mouse else None)
 
     if ctx.mock:
-        rng = np.random.default_rng(7)
+        rng = np.random.default_rng(19 if is_mouse else 7)
         W = rng.standard_normal((feats.shape[1], len(genes))) / 40
         X = np.log1p(np.exp(feats @ W))
         found = genes
+    elif is_mouse:
+        repo = ctx.settings.deepspotm_repo
+        if not repo or not repo.exists():
+            raise RuntimeError("Set deepspotm_repo in backend/config.yaml to a clone of ratschlab/DeepSpotM")
+        sys.path.insert(0, str(repo))
+        ctx.progress(0.8, f"DeepSpot-M mouse spatial expression inference (organ={organ})")
+        from deepspot import DeepSpotPredictor  # type: ignore
+        pred = DeepSpotPredictor.from_repo(str(repo), device=ctx.device)
+        ad = pred.predict_anndata(coords=centres.astype(np.float32), features=feats, genes=genes)
+        ad.write_h5ad(ctx.out_path("deepspotm_pred.h5ad"))
+        ctx.register("deepspotm_pred.h5ad", f"AnnData {ad.n_obs} spots × {ad.n_vars} mouse genes (log1p)")
+        var = list(map(str, ad.var_names))
+        cols = [var.index(g) for g in genes if g in var]
+        found = [g for g in genes if g in var]
+        if not found:
+            found, cols = var[:min(20, len(var))], list(range(min(20, len(var))))
+        Xa = ad.X[:, cols]
+        X = np.asarray(Xa.toarray() if hasattr(Xa, "toarray") else Xa, dtype=np.float32)
     else:
         repo = ctx.settings.stpath_repo
         if not repo or not (repo / "utils_data" / "symbol2ensembl.json").exists():
@@ -101,12 +138,14 @@ def run_st_wsi(ctx) -> dict:
                 ctx.log(f"Gene {g} not in STPath vocabulary — skipped")
         Xa = ad.X[:, cols]
         X = np.asarray(Xa.toarray() if hasattr(Xa, "toarray") else Xa, dtype=np.float32)
-    np.savetxt(ctx.out_path("stpath_selected_genes.csv"), np.column_stack([centres, X]), delimiter=",",
+    csv_name = "deepspotm_selected_genes.csv" if is_mouse else "stpath_selected_genes.csv"
+    title_prefix = "DeepSpot-M (mouse)" if is_mouse else "STPath"
+    np.savetxt(ctx.out_path(csv_name), np.column_stack([centres, X]), delimiter=",",
                header="x,y," + ",".join(found), comments="", fmt="%.5g")
-    ctx.register("stpath_selected_genes.csv", "Selected genes per spot (log1p), spot-centre coordinates")
+    ctx.register(csv_name, "Selected genes per spot (log1p), spot-centre coordinates")
     chans = [{"name": g, "kind": "continuous"} for g in found]
     rows = sorted([[g, round(float(X[:, i].mean()), 4), round(float(X[:, i].std()), 4)] for i, g in enumerate(found)], key=lambda r: -r[2])
     return {"summary": [{"label": "Slide", "value": sp.name}, {"label": "Spots", "value": len(centres)},
                         {"label": "Genes shown", "value": len(found)}, {"label": "Organ / tech", "value": f"{organ or '—'} / {tech or '—'}"}],
-            "panels": [ctx.spatial_panel("st", "STPath predicted expression (log1p)", sp.coords, sp.patch0, X, chans, sp.thumb, sp.scale),
+            "panels": [ctx.spatial_panel("st", f"{title_prefix} predicted expression (log1p)", sp.coords, sp.patch0, X, chans, sp.thumb, sp.scale),
                        {"type": "table", "title": "Genes ranked by spatial variability", "columns": ["Gene", "Mean log1p", "SD"], "rows": rows}]}

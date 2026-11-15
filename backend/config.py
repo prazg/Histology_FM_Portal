@@ -32,6 +32,9 @@ class Settings:
     hex_extra_pythonpath: List[Path] = field(default_factory=list)  # e.g. an openslide→tiffslide shim on Windows
     stpath_repo: Optional[Path] = None       # git clone https://github.com/Graph-and-Geometric-Learning/STPath
     stpath_weights: Optional[Path] = None    # stfm.pth (downloaded from HF tlhuang/STPath if unset)
+    tisam_repo: Optional[Path] = None        # git clone https://github.com/Kiemen-Lab/tisam (MegaMouse mouse segmentation)
+    deepspotm_repo: Optional[Path] = None    # git clone https://github.com/ratschlab/DeepSpotM (mouse spatial transcriptomics)
+    vllm_url: Optional[str] = None           # optional OpenAI-compatible vLLM URL for TissueDecision-9B (else local transformers)
     # Guided setup: lets the portal's wizard install packages and edit this config — loopback requests only.
     # The installer turns it on; the wizard's last step (or you) turns it off.
     setup_enabled: bool = False
@@ -83,6 +86,7 @@ def load_settings() -> Settings:
         "device": os.environ.get("PORTAL_DEVICE"),
         "mock": os.environ.get("PORTAL_MOCK"),
         "setup_enabled": os.environ.get("PORTAL_SETUP"),
+        "vllm_url": os.environ.get("PORTAL_VLLM_URL"),
     }
     for k, v in env.items():
         if v not in (None, ""):
@@ -99,7 +103,8 @@ def load_settings() -> Settings:
             v = [_p(x) for x in (v or [])]
         elif k == "origins":
             v = [v] if isinstance(v, str) else list(v)
-        elif k in ("work_dir", "gigatime_repo", "hex_repo", "musk_path", "hex_checkpoint", "stpath_repo", "stpath_weights"):
+        elif k in ("work_dir", "gigatime_repo", "hex_repo", "musk_path", "hex_checkpoint", "stpath_repo", "stpath_weights",
+                   "tisam_repo", "deepspotm_repo"):
             v = _p(v)
         setattr(s, k, v)
     s.work_dir.mkdir(parents=True, exist_ok=True)

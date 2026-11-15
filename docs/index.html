@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Histology FM Portal</title>
-<meta name="description" content="Run open-weight histology foundation models — patch and slide encoders, vision–language zero-shot, virtual multiplex (GigaTIME, HEX) and spatial expression (STPath) — from one interface.">
+<meta name="description" content="Run 55 open-weight clinical and preclinical histology foundation models — patch and slide encoders, vision–language zero-shot, rodent toxicologic VLM QA, virtual multiplex (GigaTIME, HEX), spatial expression (STPath, DeepSpot-M), and segmentation (HEST, GrandQC, TiSAM) — with verified paper links.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 16'%3E%3Crect width='32' height='16' rx='2' fill='%23c2407a'/%3E%3Crect width='11' height='16' fill='%23ffffffcc'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,6 +21,7 @@
       <button data-view="models">Models</button>
       <button data-view="run">Run</button>
       <button data-view="results">Results</button>
+      <button data-view="papers">Papers</button>
       <button data-view="connect">Connect</button>
     </nav>
     <div class="conn">
@@ -38,7 +39,7 @@
     <div class="intro">
       <div>
         <h1 id="h-models">Open-weight histology foundation models on one bench.</h1>
-        <p>Pick a model, give it tiles or a whole slide, and get the output its training was built for: embeddings and cluster maps, zero-shot class maps, virtual multiplex marker maps, or predicted spatial expression. Models run on your own GPU server; this page never sees your images.</p>
+        <p>Pick a clinical or preclinical model, give it tiles or a whole slide, and get the output its training was built for: embeddings and cluster maps, zero-shot class maps, rodent toxicologic pathology QA, virtual multiplex marker maps, multi-organ segmentation, or predicted spatial expression — with direct links to every paper. Models run on your own GPU server; this page never sees your images.</p>
       </div>
       <div class="counts" id="counts"></div>
     </div>
@@ -47,11 +48,15 @@
       <aside class="filters" aria-label="Filter models">
         <div>
           <label class="sr-only" for="q">Search models</label>
-          <input id="q" class="search" type="search" placeholder="Search name, lab or licence">
+          <input id="q" class="search" type="search" placeholder="Search name, lab, species or paper">
         </div>
         <div>
           <h3>Model family</h3>
           <ul class="fam-list" id="famList"></ul>
+        </div>
+        <div>
+          <h3>Species &amp; scope</h3>
+          <ul class="fam-list" id="spList"></ul>
         </div>
         <div>
           <h3>Access</h3>
@@ -129,6 +134,17 @@
       </div>
       <div id="jobView" aria-live="polite"></div>
     </div>
+  </section>
+
+  <!-- ═════════════ PAPERS & BENCHMARKS ═════════════ -->
+  <section id="view-papers" aria-labelledby="h-papers" hidden>
+    <div class="intro">
+      <div>
+        <h2 id="h-papers" style="margin-bottom:6px">Papers, citations &amp; benchmarks</h2>
+        <p class="muted">Direct DOI / arXiv / bioRxiv links and one-click BibTeX entries for every foundation model in the registry, alongside key clinical and rodent preclinical benchmarks and closed-weight reference models.</p>
+      </div>
+    </div>
+    <div id="papersView"></div>
   </section>
 
   <!-- ═════════════ CONNECT ═════════════ -->

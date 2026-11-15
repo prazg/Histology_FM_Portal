@@ -86,10 +86,13 @@ def test_health_and_models():
 
 
 def test_all_models_all_tasks():
-    reg = json.loads(server.REGISTRY_PATH.read_text())
+    reg = json.loads(server.REGISTRY_PATH.read_text(encoding="utf-8"))
+    assert "benchmarks" in reg and "literature_references" in reg
     wsi = fake_he(1400, 1000, 99)
     n = 0
     for m in reg["models"]:
+        assert m.get("paper_url") and m.get("paper_label") and m.get("citation"), m["id"]
+        assert m.get("species") in ("human", "multi-species", "rodent"), m["id"]
         for task in m["tasks"]:
             params = {"classes": CLASSES, "mpp": 0.5, "max_patches": 60, "max_spots": 60, "k": 4}
             if reg["tasks"][task]["input"] == "tiles":

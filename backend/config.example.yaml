@@ -29,3 +29,6 @@ hex_checkpoint: null                      # path to hex_nolan48.pt; null = downl
 hex_extra_pythonpath: []                  # e.g. [./external/shim] for an openslide→tiffslide shim on Windows
 stpath_repo: ./external/STPath            # git clone https://github.com/Graph-and-Geometric-Learning/STPath
 stpath_weights: null                      # path to stfm.pth; null = download tlhuang/STPath
+tisam_repo: ./external/tisam              # git clone https://github.com/Kiemen-Lab/tisam (MegaMouse mouse segmentation)
+deepspotm_repo: ./external/DeepSpotM      # git clone https://github.com/ratschlab/DeepSpotM (mouse spatial transcriptomics)
+vllm_url: null                            # optional e.g. "http://127.0.0.1:8001/v1" for TissueDecision-9B via vLLM
