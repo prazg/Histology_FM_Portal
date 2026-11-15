@@ -4,6 +4,12 @@
   const { h } = Viewers;
   const $ = s => document.querySelector(s);
   const FAM_ORDER = ["patch", "vl", "slide", "vmif", "st", "seg"];
+  const SPECIES_ORDER = ["rodent", "multi-species", "human"];
+  const SPECIES_META = {
+    rodent: { label: "Rodent / Preclinical", badge: "Rodent / Preclinical", cls: "sp-rodent", sw: "var(--eosin)" },
+    "multi-species": { label: "Multi-species & Vet", badge: "Multi-species", cls: "sp-multi", sw: "var(--haem)" },
+    human: { label: "Human clinical", badge: null, cls: "", sw: "var(--ink-3)" },
+  };
   const store = {
     get(k, d) { try { return localStorage.getItem(k) ?? sessionStorage.getItem(k) ?? d; } catch { return d; } },
     set(k, v, session) { try { (session ? sessionStorage : localStorage).setItem(k, v); (session ? localStorage : sessionStorage).removeItem(k); } catch { /* storage unavailable */ } },
@@ -14,7 +20,8 @@
     reg: null, byId: {}, conn: { mode: store.get("fm.mode", "auto"), url: store.get("fm.url", "http://127.0.0.1:8000"), key: store.get("fm.key", ""), hf: "" },
     health: null, ready: {}, connected: false, jobs: [], demoJobs: [], selJob: null, poll: null,
     bhw: null, weights: {}, perf: {}, wPoll: null, drawerModel: null, serverFound: null,
-    filt: { fam: null, q: "", commercial: false, ungated: false, ready: false, hw: false },
+    filt: { fam: null, species: null, q: "", commercial: false, ungated: false, ready: false, hw: false },
+    papers: { q: "", species: null },
     run: { model: null, task: null, src: "path", tiles: [] },
   };
   try { S.conn.hf = sessionStorage.getItem("fm.hf") || ""; } catch { /* */ }
@@ -47,14 +54,34 @@
     return api(`/api/jobs/${jobId}/spatial/${pid}/${idx}`);
   };
 
+  // ── copy & citation helpers ──────────────────────────────────────────
+  function copyText(txt, btn) {
+    const done = () => { if (!btn) return; const old = btn.textContent; btn.textContent = "Copied"; setTimeout(() => (btn.textContent = old), 1400); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done).catch(() => {});
+    else { const ta = h("textarea", { style: "position:fixed;opacity:0" }); ta.value = txt; document.body.append(ta); ta.select(); try { document.execCommand("copy"); done(); } catch { /* */ } ta.remove(); }
+  }
+  function cliBlock(code) {
+    const btn = h("button", { type: "button", class: "cli-copy", onclick: () => copyText(code, btn) }, "Copy");
+    return h("div", { class: "cli-wrap" }, h("pre", { class: "cli", text: code }), btn);
+  }
+  function bibtexFor(m) {
+    const key = m.id.replace(/[^a-zA-Z0-9_]/g, "_");
+    const yr = ((m.citation || m.paper_label || "").match(/\b(19|20)\d{2}\b/) || ["2025"])[0];
+    const cite = m.citation || `${m.developer}, ${m.name}`;
+    const [authPart, ...rest] = cite.split(",");
+    const titlePart = rest.length ? rest.join(",").replace(/\(\d{4}\)\s*$/, "").trim() : m.name;
+    return `@article{${key}_${yr},\n  author  = {${(authPart || m.developer).trim()}},\n  title   = {${titlePart}},\n  journal = {${m.paper_label || "Preprint"}},\n  year    = {${yr}},\n  url     = {${m.paper_url || m.link || ""}}\n}`;
+  }
+
   // ── routing ──────────────────────────────────────────────────────────
   function route() {
     const [view, arg] = (location.hash.slice(1) || "models").split("/");
-    const v = ["models", "run", "results", "connect"].includes(view) ? view : "models";
+    const v = ["models", "run", "results", "papers", "connect"].includes(view) ? view : "models";
     document.querySelectorAll("main > section").forEach(s => (s.hidden = s.id !== "view-" + v));
     document.querySelectorAll("nav.tabs button").forEach(b => b.dataset.view === v ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
     if (v === "run") { if (arg && S.byId[decodeURIComponent(arg)]) selectModel(decodeURIComponent(arg)); else if (!S.run.model) selectModel(S.reg.models.find(m => m.runner)?.id); }
     if (v === "results") { if (arg) S.selJob = decodeURIComponent(arg); refreshJobs(); }
+    if (v === "papers") renderPapers();
     if (v === "connect") renderConnect();
     window.scrollTo({ top: 0 });
   }
@@ -81,6 +108,9 @@
   const hwBadge = m => { const f = fitFor(m); return h("span", { class: "badge hw-" + f.level, title: f.text }, f.badge); };
 
   function outputSummary(m) {
+    if (m.runner === "tox_vlm") return "Structured VLM decisions & scores";
+    if (m.runner === "tisam") return "52 mouse tissue classes";
+    if (m.runner === "deepspotm") return "Mouse gene expression / spot";
     if (m.category === "vmif") return `${(m.channels || []).length} markers`;
     if (m.category === "st") return "Gene expression per spot";
     if (m.category === "seg") return "Tissue contours";
@@ -89,12 +119,17 @@
   }
   function inputSummary(m) {
     if (m.id === "hex_nolan48") return "56 µm patches → 384 px";
-    if (m.id === "stpath") return "55 µm spots, 100 µm pitch";
+    if (m.id === "stpath" || m.id === "deepspot_m") return "55 µm spots, 100 µm pitch";
     if (m.category === "seg") return "Whole slide";
     return m.patch_size ? `${m.patch_size} px @ ${m.mag}x` : "—";
   }
   function licenceBadge(m) {
     return h("span", { class: "badge " + (commercial(m) ? "free" : "nc"), title: m.licence }, commercial(m) ? m.licence : "Non-commercial");
+  }
+  function speciesBadge(m) {
+    const sp = SPECIES_META[m.species];
+    if (!sp || !sp.badge) return null;
+    return h("span", { class: "badge " + sp.cls, title: m.species_note || sp.label }, sp.badge);
   }
 
   function slideCard(m) {
@@ -103,12 +138,12 @@
     const el = h("button", { class: `slide fam-${m.category}`, type: "button", "data-ready": ready === false ? "no" : "yes", "aria-label": `${m.name} — details` },
       h("span", { class: "label" },
         h("span", { class: "nm", text: m.name }), h("span", { class: "dev", text: m.developer }),
-        h("span", { class: "badges" }, licenceBadge(m), m.gated ? h("span", { class: "badge", title: "Request access on Hugging Face" }, "Access request") : null,
+        h("span", { class: "badges" }, speciesBadge(m), licenceBadge(m), m.gated ? h("span", { class: "badge", title: "Request access on Hugging Face" }, "Access request") : null,
           ready && S.conn.mode === "server" ? h("span", { class: "badge ready" }, "Ready") : null)),
       h("span", { class: "specimen" },
         h("dl", {}, h("dt", { text: "Output" }), h("dd", { text: outputSummary(m) }), h("dt", { text: "Input" }), h("dd", { text: inputSummary(m) }),
           h("dt", { text: "Hardware" }), h("dd", {}, hwBadge(m))),
-        h("span", { class: "tasks", text: tasks })));
+        h("span", { class: "tasks", text: m.paper_label ? `${tasks} · ${m.paper_label}` : tasks })));
     el.addEventListener("click", () => openDrawer(m));
     return el;
   }
@@ -116,8 +151,9 @@
   function filtered() {
     const f = S.filt, q = f.q.toLowerCase();
     return S.reg.models.filter(m =>
-      (!f.fam || m.category === f.fam) && (!f.commercial || commercial(m)) && (!f.ungated || !m.gated) && (!f.ready || isReady(m)) && (!f.hw || ["good", "ok"].includes(fitFor(m).level)) &&
-      (!q || [m.name, m.developer, m.licence, m.hf_repo, m.id].join(" ").toLowerCase().includes(q)));
+      (!f.fam || m.category === f.fam) && (!f.species || m.species === f.species) &&
+      (!f.commercial || commercial(m)) && (!f.ungated || !m.gated) && (!f.ready || isReady(m)) && (!f.hw || ["good", "ok"].includes(fitFor(m).level)) &&
+      (!q || [m.name, m.developer, m.licence, m.hf_repo, m.id, m.species, m.species_note, m.paper_label, m.citation].join(" ").toLowerCase().includes(q)));
   }
 
   function renderFamilies() {
@@ -127,6 +163,17 @@
         h("span", { class: "sw", style: "background:linear-gradient(135deg,var(--haem),var(--eosin))" }), "All families", h("span", { class: "n", text: S.reg.models.length }))),
       ...FAM_ORDER.map(c => h("li", {}, h("button", { "aria-pressed": String(S.filt.fam === c), onclick: () => { S.filt.fam = S.filt.fam === c ? null : c; renderFamilies(); renderRack(); } },
         h("span", { class: "sw", style: `background:var(--c-${c})` }), famLabel(c), h("span", { class: "n", text: counts[c] })))));
+  }
+
+  function renderSpecies() {
+    const box = $("#spList");
+    if (!box) return;
+    const counts = Object.fromEntries(SPECIES_ORDER.map(s => [s, S.reg.models.filter(m => m.species === s).length]));
+    box.replaceChildren(
+      h("li", {}, h("button", { "aria-pressed": String(!S.filt.species), onclick: () => { S.filt.species = null; renderSpecies(); renderRack(); } },
+        h("span", { class: "sw", style: "background:linear-gradient(135deg,var(--eosin),var(--haem))" }), "All scopes", h("span", { class: "n", text: S.reg.models.length }))),
+      ...SPECIES_ORDER.map(s => h("li", {}, h("button", { "aria-pressed": String(S.filt.species === s), onclick: () => { S.filt.species = S.filt.species === s ? null : s; renderSpecies(); renderRack(); } },
+        h("span", { class: "sw", style: `background:${SPECIES_META[s].sw}` }), SPECIES_META[s].label, h("span", { class: "n", text: counts[s] })))));
   }
 
   function renderRack() {
@@ -139,9 +186,9 @@
         h("div", { class: "rack" }, list.filter(m => m.category === c).map(slideCard)))));
   }
   function resetFilters() {
-    Object.assign(S.filt, { fam: null, q: "", commercial: false, ungated: false, ready: false, hw: false });
+    Object.assign(S.filt, { fam: null, species: null, q: "", commercial: false, ungated: false, ready: false, hw: false });
     $("#q").value = ""; ["#fCommercial", "#fUngated", "#fReady", "#fHw"].forEach(s => ($(s).checked = false));
-    renderFamilies(); renderRack();
+    renderFamilies(); renderSpecies(); renderRack();
   }
   $("#q").addEventListener("input", e => { S.filt.q = e.target.value; renderRack(); });
   $("#fCommercial").addEventListener("change", e => { S.filt.commercial = e.target.checked; renderRack(); });
@@ -153,6 +200,7 @@
     const M = S.reg.models;
     $("#counts").replaceChildren(
       h("div", {}, h("b", { text: M.filter(m => m.runner).length }), "runnable models"),
+      h("div", {}, h("b", { text: M.filter(m => m.species !== "human").length }), "animal & cross-species"),
       h("div", {}, h("b", { text: M.filter(m => !m.gated).length }), "no access request"),
       h("div", {}, h("b", { text: M.filter(commercial).length }), "commercial-use licences"));
     $("#regDate").textContent = S.reg.version;
@@ -163,10 +211,17 @@
     const d = $("#drawer");
     S.drawerModel = m;
     const st = S.ready[m.id];
+    const spLabel = (SPECIES_META[m.species] || SPECIES_META.human).label;
+    const bibBtn = h("button", { type: "button", class: "btn ghost small", style: "margin-left:8px", onclick: () => copyText(bibtexFor(m), bibBtn) }, "Copy BibTeX");
+    const cli = m.tasks && m.tasks.length ? cliFor(m, m.tasks[0]) : null;
     const rows = [
-      ["Family", famLabel(m.category)], ["Developer", m.developer], ["Output", outputSummary(m)], ["Input", inputSummary(m)],
+      ["Family", famLabel(m.category)], ["Developer", m.developer],
+      ["Species & scope", m.species_note ? `${spLabel} — ${m.species_note}` : spLabel],
+      ["Output", outputSummary(m)], ["Input", inputSummary(m)],
       ["Licence", m.licence], ["Access", m.gated ? "Gated — request access on Hugging Face, then log in on the server" : "Open download"],
-      ["Weights", m.link ? h("a", { href: m.link, target: "_blank", rel: "noopener" }, m.hf_repo || m.link) : "—"],
+      m.paper_url ? ["Paper / preprint", h("span", {}, h("a", { href: m.paper_url, target: "_blank", rel: "noopener", text: m.paper_label || m.paper_url }), bibBtn,
+        m.citation ? h("span", { class: "paper-cite", text: m.citation }) : null)] : null,
+      ["Weights / code", m.link ? h("a", { href: m.link, target: "_blank", rel: "noopener" }, m.hf_repo || m.link) : "—"],
       m.trident_name ? ["TRIDENT name", h("code", { text: m.trident_name })] : null,
       m.patch_encoder ? ["Patch encoder", h("code", { text: m.patch_encoder })] : null,
       ["Verified against", [...(m.source || "").split("+"), ...(m.weights && m.weights.length ? ["HFsize"] : [])].map(k => S.reg.verified_against[k] || k).join("; ")],
@@ -174,7 +229,7 @@
     ].filter(Boolean);
     d.replaceChildren(
       h("div", { class: `drawer-head fam-${m.category}` },
-        h("p", { class: "small muted", style: "margin:0 0 4px", text: famLabel(m.category) }), h("h2", { id: "drawerTitle", text: m.name }),
+        h("p", { class: "small muted", style: "margin:0 0 4px", text: `${famLabel(m.category)} · ${spLabel}` }), h("h2", { id: "drawerTitle", text: m.name }),
         h("button", { class: "icon-btn close-x", "aria-label": "Close", onclick: () => d.close() }, "✕")),
       h("div", { class: "drawer-body" },
         h("dl", { class: "kv" }, rows.flatMap(([k, v]) => [h("dt", { text: k }), h("dd", {}, v)])),
@@ -183,7 +238,10 @@
         m.channels ? h("details", {}, h("summary", { text: `${m.channels.length} output channels` }), h("p", { class: "small", text: m.channels.join(", ") })) : null,
         (m.tasks || []).length ? h("div", {}, h("h3", { text: "Tasks and outputs", style: "margin-bottom:8px" }),
           h("ul", { class: "small", style: "margin:0;padding-left:1.1em" }, m.tasks.map(t => h("li", {}, h("strong", { text: S.reg.tasks[t].label }), " — ", S.reg.tasks[t].outputs.join("; "))))) : null,
-        m.runner ? h("div", {}, h("button", { class: "btn", onclick: () => { d.close(); go("run/" + encodeURIComponent(m.id)); } }, `Run ${m.name}`)) : null));
+        cli ? h("details", {}, h("summary", { class: "small", text: "Python / CLI quickstart" }), cliBlock(cli)) : null,
+        m.runner ? h("div", { style: "display:flex;gap:10px;flex-wrap:wrap" },
+          h("button", { class: "btn", onclick: () => { d.close(); go("run/" + encodeURIComponent(m.id)); } }, `Run ${m.name}`),
+          m.paper_url ? h("a", { class: "btn ghost", href: m.paper_url, target: "_blank", rel: "noopener" }, "Read paper") : null) : null));
     if (!keepOpen) d.showModal();
   }
   $("#drawer").addEventListener("click", e => { if (e.target.id === "drawer") e.target.close(); });
@@ -193,8 +251,12 @@
   const PRESETS = {
     "Glioblastoma regions (Ivy GAP-style)": "cellular tumour: densely cellular glioblastoma | hypercellular glioma tissue\nnecrosis: necrotic tissue | pseudopalisading necrosis\nmicrovascular proliferation: microvascular proliferation | glomeruloid blood vessels\ninfiltrating tumour: tumour cells infiltrating brain parenchyma\nnormal brain: normal brain tissue | normal cerebral cortex",
     "Tumour microenvironment compartments": "tumour: tumour cells\nstroma: fibrous stroma | extracellular matrix\nimmune infiltrate: lymphocytes | immune cell infiltrate\nmacrophages: macrophages | foamy histiocytes\nnecrosis: necrosis\nvessels: blood vessels",
+    "Rodent liver toxicology (TG-GATEs / VIPER)": "no abnormality: normal rodent hepatic parenchyma within normal limits | unremarkable control liver\nhepatocellular hypertrophy: centrilobular hepatocellular hypertrophy | enlarged eosinophilic hepatocytes\nsingle-cell necrosis: hepatocellular necrosis | pyknosis karyorrhexis acidophilic bodies\nvacuolation / steatosis: microvesicular or macrovesicular cytoplasmic vacuolation | lipid droplets\ninflammatory infiltrate: mixed mononuclear or neutrophilic portal and lobular inflammation\nbile duct hyperplasia: biliary hyperplasia and oval cell proliferation",
+    "Rodent renal tubular injury (rat/mouse)": "normal cortex: unremarkable renal glomeruli and proximal convoluted tubules\ntubular degeneration / necrosis: proximal tubular epithelial necrosis sloughing and hyaline casts\ntubular basophilia / regeneration: basophilic regenerating renal tubules with crowded nuclei\ninterstitial nephritis: mononuclear interstitial inflammatory infiltrate and fibrosis",
+    "Mouse GEMM lung oncology": "normal lung: normal mouse alveolar parenchyma and bronchiolar epithelium\nhyperplasia / adenoma: atypical adenomatous hyperplasia or pulmonary adenoma\nadenocarcinoma: invasive murine lung adenocarcinoma with nuclear atypia\nimmune stroma: perivascular and peribronchiolar lymphoid infiltrate",
     "Tumour vs normal": "tumour: malignant tumour tissue\nnormal: normal tissue",
   };
+  const MOUSE_GENES_DEF = "Alb, Cyp2e1, Glul, Ass1, Pecam1, Col1a1, Ptprc, Adgre1, Acta2, Mki67, Havcr1, Lcn2, Slc34a1, Sftpc, Gfap, Sox2";
   const PARAMS = {
     k: { label: "Clusters (k-means)", type: "number", min: 2, max: 12, def: 6 },
     mag: { label: "Magnification", type: "number", min: 5, max: 40, hint: "Model default shown. Changing it usually degrades features." },
@@ -207,8 +269,8 @@
     topk_frac: { label: "Top-k fraction for slide score", type: "number", min: .01, max: 1, step: .01, def: .05 },
     max_tile_maps: { label: "Tiles with full maps", type: "number", min: 1, max: 64, def: 12 },
     footprint_um: { label: "Patch footprint (µm)", type: "number", min: 20, max: 200, def: 56, hint: "Physical size of each HEX patch at level 0." },
-    genes: { label: "Genes to map", type: "textarea", def: "GFAP, SOX2, OLIG2, EGFR, CD44, CHI3L1, VIM, MKI67, PTPRC, CD68, CD163, AIF1, CD3E, CD8A, PECAM1, VEGFA, COL1A1, COL4A1, FN1, POSTN", hint: "HGNC symbols; the full prediction is in the .h5ad." },
-    organ: { label: "Organ", type: "text", def: "Brain", hint: "Must match STPath's organ vocabulary (stpath/utils/constants.py); blank = unknown." },
+    genes: { label: "Genes to map", type: "textarea", def: "GFAP, SOX2, OLIG2, EGFR, CD44, CHI3L1, VIM, MKI67, PTPRC, CD68, CD163, AIF1, CD3E, CD8A, PECAM1, VEGFA, COL1A1, COL4A1, FN1, POSTN", hint: "HGNC (human) or MGI (mouse) gene symbols; the full prediction is in the .h5ad." },
+    organ: { label: "Organ / study context", type: "text", def: "Brain", hint: "For STPath: organ vocabulary (blank = unknown). For TissueDecision-9B: preclinical organ/species context." },
     tech: { label: "Technology", type: "text", def: "Visium", hint: "From STPath's tech vocabulary; blank = unknown." },
     pitch_um: { label: "Spot pitch (µm)", type: "number", def: 100 }, spot_um: { label: "Spot diameter (µm)", type: "number", def: 55 },
     max_spots: { label: "Max spots", type: "number", def: 3000 },
@@ -219,6 +281,7 @@
       case "embed_tiles": return ["k"];
       case "embed_wsi": return ["mag", "patch_size", "k", ...WSI_COMMON, "batch_size"];
       case "zeroshot_tiles": return ["classes"];
+      case "tox_vqa": return ["classes", "organ"];
       case "zeroshot_wsi": return ["classes", "mag", "patch_size", "topk_frac", ...WSI_COMMON];
       case "slide_embed": return WSI_COMMON;
       case "slide_zeroshot": return ["classes", ...WSI_COMMON];
@@ -264,15 +327,19 @@
     for (const k of keys) {
       if (k === "classes") {
         const ta = h("textarea", { id: "p_classes", spellcheck: "false", "aria-describedby": "p_classes_h" });
-        ta.value = PRESETS["Glioblastoma regions (Ivy GAP-style)"];
-        kids.push(h("div", { class: "field" }, h("label", { for: "p_classes", text: "Classes and prompts" }),
+        ta.value = (t === "tox_vqa" || m.species === "rodent")
+          ? PRESETS["Rodent liver toxicology (TG-GATEs / VIPER)"]
+          : PRESETS["Glioblastoma regions (Ivy GAP-style)"];
+        kids.push(h("div", { class: "field" }, h("label", { for: "p_classes", text: t === "tox_vqa" ? "Candidate findings & morphological criteria" : "Classes and prompts" }),
           h("div", { class: "chips" }, Object.keys(PRESETS).map(p => h("button", { type: "button", class: "btn ghost small", onclick: () => (ta.value = PRESETS[p]) }, p))),
-          ta, h("span", { class: "hint", id: "p_classes_h", text: "One class per line: name: prompt | another prompt. Prompts per class are averaged. Wording changes results — try a few." })));
+          ta, h("span", { class: "hint", id: "p_classes_h", text: "One class/finding per line: name: description | synonym. Presets cover both human oncology and rodent preclinical toxicology." })));
         continue;
       }
       const d = PARAMS[k];
       let def = d.def;
       if (k === "mag") def = m.mag; if (k === "patch_size") def = m.patch_size;
+      if (k === "genes" && m.runner === "deepspotm") def = MOUSE_GENES_DEF;
+      if (k === "organ" && (t === "tox_vqa" || m.species === "rodent")) def = m.runner === "deepspotm" ? "Mouse liver" : "Rat liver (Open TG-GATEs / INHAND)";
       if (k === "max_patches" && t === "vmif_wsi" && m.runner === "gigatime") def = 3000;
       const id = "p_" + k;
       let input;
@@ -299,7 +366,15 @@
   }
 
   function cliFor(m, t) {
-    const wsi = S.reg.tasks[t].input === "wsi";
+    const wsi = t && S.reg.tasks[t] && S.reg.tasks[t].input === "wsi";
+    if (m.runner === "tox_vlm") return `# Serve TissueDecision-9B via vLLM (or run directly via transformers)\nvllm serve ${m.hf_repo} --port 8001 --dtype bfloat16\n# Or in Python with transformers:\nfrom transformers import AutoProcessor, AutoModelForImageTextToText\nproc = AutoProcessor.from_pretrained("${m.hf_repo}", trust_remote_code=True)\nmodel = AutoModelForImageTextToText.from_pretrained("${m.hf_repo}", torch_dtype="auto", device_map="auto")`;
+    if (m.id === "loki") return `import open_clip\nfrom huggingface_hub import hf_hub_download\nckpt = hf_hub_download("WangGuangyuLab/Loki", "checkpoint.pt")\nmodel, _, preprocess = open_clip.create_model_and_transforms("coca_ViT-L-14", pretrained=ckpt)\ntok = open_clip.get_tokenizer("coca_ViT-L-14")`;
+    if (m.id === "plip") return `from transformers import CLIPModel, CLIPProcessor\nmodel = CLIPModel.from_pretrained("vinid/plip").eval().to("cuda")\nproc = CLIPProcessor.from_pretrained("vinid/plip")`;
+    if (m.id === "quiltnet_b32") return `import open_clip\nmodel, preprocess = open_clip.create_model_from_pretrained("hf-hub:wisdomik/QuiltNet-B-32")\ntok = open_clip.get_tokenizer("hf-hub:wisdomik/QuiltNet-B-32")`;
+    if (m.runner === "tisam") return `git clone https://github.com/Kiemen-Lab/tisam\n# Segment 52 MegaMouse mouse compartments over UNI2-h features:\npython -m tisam.infer --wsi mouse_slide.svs --out_dir ./megamouse_out`;
+    if (m.runner === "deepspotm") return `git clone https://github.com/ratschlab/DeepSpotM\n# Predict virtual Mus musculus spatial gene expression from H&E:\npython -m deepspot.predict --wsi mouse_slide.ndpi --backbone uni_v1 --out deepspotm.h5ad`;
+    if (m.runner === "stpath") return `from stpath.app.pipeline.inference import STPathInference\nagent = STPathInference(gene_voc_path="utils_data/symbol2ensembl.json", model_weight_path="stfm.pth", device=0)\nadata = agent.inference(coords=centres, img_features=gigapath_feats, organ_type="Brain", tech_type="Visium")`;
+    if (m.runner === "gigatime") return `# Clone https://github.com/prov-gigatime/GigaTIME and load prov-gigatime/GigaTIME:\nfrom huggingface_hub import hf_hub_download\nckpt = hf_hub_download("prov-gigatime/GigaTIME", "model.pt")`;
     if (m.category === "slide") return `python run_batch_of_slides.py --task all --wsi_dir ./wsis --job_dir ./out \\\n  --slide_encoder ${m.trident_name} --patch_size ${m.patch_size} --mag ${m.mag}`;
     if (m.runner === "trident_patch" && wsi) return `python run_batch_of_slides.py --task all --wsi_dir ./wsis --job_dir ./out \\\n  --patch_encoder ${m.trident_name} --patch_size ${m.patch_size} --mag ${m.mag}`;
     if (m.runner === "trident_patch") return `from trident.patch_encoder_models import encoder_factory\nenc = encoder_factory("${m.trident_name}").eval().to("cuda")\nx = torch.stack([enc.eval_transforms(im) for im in tiles]).to("cuda")\nwith torch.inference_mode():\n    feats = enc(x)   # [N, ${m.embed_dim}]`;
@@ -317,8 +392,11 @@
         h("strong", { text: m.licence + ". " }), commercial(m) ? "Check the model card for attribution terms." : "Academic, non-commercial use only. ",
         m.gated ? h("span", {}, "You need approved access to ", h("a", { href: m.link, target: "_blank", rel: "noopener", text: m.hf_repo }), " on Hugging Face.") : null),
     ];
+    if (m.paper_url) kids.push(h("div", { class: "card small" }, h("h3", { text: "Publication" }),
+      h("p", { style: "margin:0" }, h("a", { href: m.paper_url, target: "_blank", rel: "noopener", text: m.paper_label || m.paper_url }),
+        m.citation ? h("span", { class: "paper-cite", text: m.citation }) : null)));
     if (m.notes) kids.push(h("div", { class: "card small" }, h("h3", { text: "Model notes" }), h("p", { style: "margin:0", text: m.notes })));
-    if (cli) kids.push(h("div", { class: "card" }, h("h3", { text: "Reproduce outside the portal" }), h("pre", { class: "cli", text: cli })));
+    if (cli) kids.push(h("div", { class: "card" }, h("h3", { text: "Reproduce outside the portal" }), cliBlock(cli)));
     $("#runAside").replaceChildren(...kids);
   }
 
@@ -613,7 +691,7 @@
     }
     if (S.connected && S.conn.mode === "server") { const r = weightsRow(m); if (r) box.append(r); }
     const cmds = hfCommands(m);
-    if (cmds) box.append(h("details", {}, h("summary", { class: "small", text: "Download weights by hand" }), h("pre", { class: "cli", text: cmds }),
+    if (cmds) box.append(h("details", {}, h("summary", { class: "small", text: "Download weights by hand" }), cliBlock(cmds),
       h("p", { class: "small muted", style: "margin-top:6px", text: "Run on the server machine after hf auth login. Files land in the Hugging Face cache, where the portal finds them." })));
     return box;
   }
@@ -710,7 +788,7 @@
           " walks you through installing and connecting a server, one step at a time."),
         h("p", { class: "small muted", text: os !== "Unknown" ? `Your browser reports ${os}.` : "" }),
         h("div", { class: "seg-ctl", role: "group", "aria-label": "Platform" }, tabs.map(([k, l]) => h("button", { type: "button", "aria-pressed": String(k === cur), onclick: () => { cur = k; draw(); } }, l))),
-        h("pre", { class: "cli", text: cmd[cur] }), h("p", { class: "small", style: "margin-top:8px", text: note[cur] }),
+        cliBlock(cmd[cur]), h("p", { class: "small", style: "margin-top:8px", text: note[cur] }),
         h("details", {}, h("summary", { class: "small", text: "First-time install for real models" }),
           h("ol", { class: "setup small" },
             h("li", {}, "Install PyTorch with CUDA for your GPU from pytorch.org (CPU-only PyTorch leaves the GPU unused — the portal warns you if this happens)."),
@@ -722,12 +800,81 @@
     draw();
   }
 
+  // ── papers & benchmarks ──────────────────────────────────────────────
+  function renderPapers() {
+    const box = $("#papersView");
+    if (!box || !S.reg) return;
+    const tbody = h("tbody");
+    const copyAllBtn = h("button", { type: "button", class: "btn ghost small" });
+    const searchIn = h("input", { class: "search", type: "search", value: S.papers.q, placeholder: "Filter by model, author, journal, DOI or organ…" });
+    const spTabs = [["", "All (" + S.reg.models.length + ")"], ...SPECIES_ORDER.map(k => [k, `${SPECIES_META[k].label} (${S.reg.models.filter(m => m.species === k).length})`])];
+    const spWrap = h("div", { class: "seg-ctl", role: "group", "aria-label": "Species scope" });
+
+    const drawRows = () => {
+      const q = S.papers.q.toLowerCase();
+      const sp = S.papers.species;
+      const list = S.reg.models.filter(m =>
+        (!sp || m.species === sp) &&
+        (!q || [m.name, m.developer, m.paper_label, m.citation, m.hf_repo, m.species_note, famLabel(m.category)].join(" ").toLowerCase().includes(q)));
+      copyAllBtn.textContent = `Copy BibTeX (${list.length})`;
+      copyAllBtn.onclick = () => copyText(list.map(bibtexFor).join("\n\n"), copyAllBtn);
+      spWrap.replaceChildren(...spTabs.map(([k, l]) => h("button", { type: "button", "aria-pressed": String((S.papers.species || "") === k),
+        onclick: () => { S.papers.species = k || null; drawRows(); } }, l)));
+      tbody.replaceChildren(...(list.length ? list.map(m => {
+        const bBtn = h("button", { type: "button", class: "btn ghost small", onclick: () => copyText(bibtexFor(m), bBtn) }, "BibTeX");
+        return h("tr", {},
+          h("td", {}, h("button", { type: "button", class: "btn ghost small", style: "font-weight:700;padding:2px 6px", onclick: () => openDrawer(m) }, m.name),
+            h("span", { class: "paper-cite", text: m.developer })),
+          h("td", { text: famLabel(m.category) }),
+          h("td", {}, speciesBadge(m) || h("span", { class: "small muted", text: "Human clinical" })),
+          h("td", {}, m.paper_url ? h("a", { href: m.paper_url, target: "_blank", rel: "noopener", text: m.paper_label || "Paper" }) : "—",
+            m.citation ? h("span", { class: "paper-cite", text: m.citation }) : null),
+          h("td", {}, m.link ? h("a", { href: m.link, target: "_blank", rel: "noopener", text: m.hf_repo || "Repository" }) : "—"),
+          h("td", {}, bBtn));
+      }) : [h("tr", {}, h("td", { colspan: 6, class: "small muted", text: "No models match this search." }))]));
+    };
+    searchIn.addEventListener("input", e => { S.papers.q = e.target.value; drawRows(); });
+    drawRows();
+
+    const benches = (S.reg.benchmarks || []).map(b => h("div", { class: "bench-card" },
+      h("div", { style: "display:flex;justify-content:space-between;gap:8px;align-items:baseline" },
+        h("h4", { text: b.name }), h("span", { class: "badge", text: b.species })),
+      h("p", { text: b.scope }),
+      h("div", { class: "bench-links" },
+        b.paper_url ? h("a", { href: b.paper_url, target: "_blank", rel: "noopener", text: `Paper (${b.paper_label})` }) : null,
+        b.data_url ? h("a", { href: b.data_url, target: "_blank", rel: "noopener", text: "Dataset / code" }) : null)));
+
+    const refs = (S.reg.literature_references || []).map(r => h("div", { class: "bench-card" },
+      h("div", { style: "display:flex;justify-content:space-between;gap:8px;align-items:baseline" },
+        h("h4", { text: r.name }), h("span", { class: "badge", text: r.status })),
+      h("span", { class: "small muted", text: r.developer }),
+      h("p", { text: r.scope }),
+      h("div", { class: "bench-links" },
+        r.paper_url ? h("a", { href: r.paper_url, target: "_blank", rel: "noopener", text: r.paper_label }) : null)));
+
+    box.replaceChildren(
+      h("div", { class: "papers-toolbar" }, searchIn, spWrap, copyAllBtn),
+      h("div", { class: "card", style: "padding:0;overflow:hidden" },
+        h("div", { class: "table-wrap", style: "max-height:560px" },
+          h("table", { class: "data" },
+            h("thead", {}, h("tr", {}, ["Model", "Family", "Scope", "Paper / preprint", "Weights / repo", "Cite"].map(c => h("th", { text: c })))),
+            tbody))),
+      benches.length ? h("div", { style: "margin-top:32px" },
+        h("h3", { text: "Clinical & preclinical pathology benchmarks" }),
+        h("p", { class: "small muted", text: "Standardized evaluation suites for human clinical slides, rodent toxicologic pathology (rat/mouse), multi-organ mouse segmentation, and spatial transcriptomics." }),
+        h("div", { class: "bench-grid" }, benches)) : null,
+      refs.length ? h("div", { style: "margin-top:32px" },
+        h("h3", { text: "Closed-weight preclinical references & ecosystem papers" }),
+        h("p", { class: "small muted", text: "Proprietary pharmaceutical rodent toxicology foundation models and domain-adaptation frameworks cited alongside open-weight alternatives." }),
+        h("div", { class: "bench-grid" }, refs)) : null);
+  }
+
   // ── boot ─────────────────────────────────────────────────────────────
   (async function boot() {
     try { S.reg = await (await fetch("models.json", { cache: "no-cache" })).json(); }
     catch (e) { $("#rack").replaceChildren(h("div", { class: "notice err", text: "Could not load models.json. Serve this folder over HTTP (GitHub Pages, or python -m http.server) rather than opening the file directly." })); return; }
     S.reg.models.forEach(m => (S.byId[m.id] = m));
-    renderCounts(); renderFamilies(); fillModelSelect();
+    renderCounts(); renderFamilies(); renderSpecies(); fillModelSelect();
     renderHwBar();
     HW.detectBrowser().then(b => { S.bhw = b; renderHwBar(); renderRack(); if (S.run.model && !$("#view-run").hidden) renderAside(S.run.model, S.run.task); if (!$("#view-connect").hidden) renderLaunch(); });
     // Arriving from the installer: #setup&url=…&key=… (the fragment never leaves the browser)

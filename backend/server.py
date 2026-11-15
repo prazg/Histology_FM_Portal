@@ -29,7 +29,7 @@ from jobs import JobManager
 from runners import dispatch, runner_status
 from weights import WeightsManager, hf_cache_dir
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 settings = load_settings()
 registry = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
 MODELS = {m["id"]: m for m in registry["models"]}

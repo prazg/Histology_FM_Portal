@@ -101,7 +101,7 @@
     const r = rng(hash(model.id + task));
     const file = (name, url) => (S.files[name] = url, name);
     const panels = [], summary = [];
-    const isTiles = task.endsWith("_tiles");
+    const isTiles = task.endsWith("_tiles") || task === "tox_vqa";
     const thumbFiles = [];
 
     if (isTiles) {
@@ -118,11 +118,22 @@
         const sim = pts.map(p => pts.map(q => Math.max(-1, 1 - Math.hypot(p[0] - q[0], p[1] - q[1]) / 4)));
         panels.push({ type: "matrix", title: "Cosine similarity", rows: names, cols: names, values: sim, vmin: Math.min(...sim.flat()), vmax: 1 });
         summary.push({ label: "Embedding dim", value: model.embed_dim || 512 });
-      } else if (task === "zeroshot_tiles") {
+      } else if (task === "zeroshot_tiles" || task === "tox_vqa") {
         const cls = parseClasses(params.classes);
         const P = stats.map(st => softmax(cls.map((_, j) => 4 * Math.sin(j * 2.1 + st[0] * 7 + st[2] * 3) + r())));
-        panels.push({ type: "bars", title: "Class probabilities", labels: cls, rows: names, values: P, thumbs: thumbFiles, percent: true });
-        panels.push({ type: "matrix", title: "Probability matrix (tiles × classes)", rows: names, cols: cls, values: P, vmin: 0, vmax: 1 });
+        panels.push({ type: "bars", title: task === "tox_vqa" ? "Finding / decision scores per tile" : "Class probabilities", labels: cls, rows: names, values: P, thumbs: thumbFiles, percent: true });
+        panels.push({ type: "matrix", title: task === "tox_vqa" ? "Finding probability matrix (tiles × findings)" : "Probability matrix (tiles × classes)", rows: names, cols: cls, values: P, vmin: 0, vmax: 1 });
+        if (task === "tox_vqa") {
+          const organ = params.organ || "Rodent liver / preclinical tissue";
+          summary.push({ label: "Organ context", value: organ });
+          panels.push({ type: "table", title: "Structured morphological decisions & rationales",
+            columns: ["Tile", "Primary finding", "Confidence", "Morphological rationale"],
+            rows: names.map((nm, i) => {
+              const best = P[i].indexOf(Math.max(...P[i]));
+              return [nm, cls[best], (P[i][best] * 100).toFixed(1) + "%",
+                `[Synthetic demo · ${organ}] Tile colour/nuclear profile scores highest on '${cls[best]}'. Connect a backend to run ${model.name}.`];
+            }) });
+        }
       } else if (task === "vmif_tiles") {
         const ch = (model.channels || []).filter(c => !(model.background_channels || []).includes(c));
         const tilesOut = T.slice(0, 8).map((t, i) => ({ name: t.name, thumb: thumbFiles[i], images: ch.map((c, j) => {
@@ -160,7 +171,10 @@
           [P.map(p => p.indexOf(Math.max(...p))), ...cls.map((_, j) => P.map(p => p[j]))]);
         panels.push({ type: "bars", title: "Slide-level scores", labels: cls, rows: ["Mean of all patches"], values: [cls.map((_, j) => P.reduce((s, p) => s + p[j], 0) / P.length)], percent: true });
       } else if (task === "vmif_wsi" || task === "st_wsi") {
-        const names = task === "st_wsi" ? String(params.genes || "GFAP,SOX2,OLIG2,EGFR,CD44,CHI3L1,VIM,MKI67,PTPRC,CD68,CD163,PECAM1,VEGFA,COL4A1,FN1,POSTN").split(/[,\n]/).map(x => x.trim()).filter(Boolean)
+        const defGenes = model.runner === "deepspotm"
+          ? "Alb,Cyp2e1,Glul,Ass1,Pecam1,Col1a1,Ptprc,Adgre1,Acta2,Mki67,Havcr1,Lcn2,Slc34a1,Sftpc,Gfap,Sox2"
+          : "GFAP,SOX2,OLIG2,EGFR,CD44,CHI3L1,VIM,MKI67,PTPRC,CD68,CD163,PECAM1,VEGFA,COL4A1,FN1,POSTN";
+        const names = task === "st_wsi" ? String(params.genes || defGenes).split(/[,\n]/).map(x => x.trim()).filter(Boolean)
           : (model.channels || []).filter(c => !(model.background_channels || []).includes(c));
         const cols = names.map((_, j) => fld(20 + j).map(v => Math.max(0, v * .4 + .3)));
         spatial(task === "st_wsi" ? "st" : "vmif", task === "st_wsi" ? "Predicted expression (log1p)" : "Virtual multiplex", names.map(n => ({ name: n, kind: "continuous" })), cols);
@@ -174,7 +188,12 @@
         panels.push({ type: "vector", title: `${model.name} slide embedding (768-d)`, values: Array.from({ length: 768 }, () => (r() - .5) * 2 * Math.exp(-r() * 2)) });
         panels.push({ type: "image", title: "Slide thumbnail", src: thumb });
       } else if (task === "segment_wsi") {
-        panels.push({ type: "image", title: "Tissue segmentation", src: thumb });
+        panels.push({ type: "image", title: model.runner === "tisam" ? "TiSAM (MegaMouse) multi-compartment segmentation" : "Tissue segmentation", src: thumb });
+        if (model.runner === "tisam") {
+          panels.push({ type: "table", title: "Segmented mouse tissue compartments", columns: ["Compartment", "Area (px)", "% of tissue"],
+            rows: [["Hepatic parenchyma / cortex", 142800, "58.2%"], ["Portal triad / vasculature", 44120, "18.0%"],
+                   ["Biliary / tubular epithelium", 34900, "14.2%"], ["Connective stroma / capsule", 23580, "9.6%"]] });
+        }
       }
     }
     return { id, model_id: model.id, task, status: "done", progress: 1, stage: "Finished", created: Date.now() / 1000, params,

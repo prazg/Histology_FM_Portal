@@ -227,7 +227,46 @@ class QuiltAdapter(Adapter):
         return CustomInferenceEncoder("quiltnet_b32", M(self.model), self.preprocess, torch.float32)
 
 
-ADAPTERS = {"conch": ConchAdapter, "musk": MuskAdapter, "keep": KeepAdapter, "plip": PlipAdapter, "quiltnet": QuiltAdapter}
+class LokiAdapter(Adapter):
+    """Loki / OmiCLIP (WangGuangyuLab/Loki) — CoCa ViT-L/14 visual-omics model for mouse & human histology."""
+    scale_documented = True
+    ARCH = "coca_ViT-L-14"
+    REPO = "WangGuangyuLab/Loki"
+
+    def __init__(self, ctx):
+        super().__init__(ctx)
+        import open_clip
+        from huggingface_hub import hf_hub_download
+        ctx.progress(0.02, f"Loading {self.REPO} ({self.ARCH} via open_clip)")
+        ckpt = hf_hub_download(self.REPO, "checkpoint.pt")
+        self.model, _, self.preprocess = open_clip.create_model_and_transforms(self.ARCH, pretrained=ckpt)
+        self.model = self.model.eval().to(ctx.device)
+        self.tok = open_clip.get_tokenizer(self.ARCH)
+        self.scale = float(self.model.logit_scale.exp().item()) if hasattr(self.model, "logit_scale") else DEFAULT_SCALE
+
+    def encode_images(self, imgs):
+        import torch
+        out = []
+        for _, chunk in batched(imgs, 64):
+            x = torch.stack([self.preprocess(im) for im in chunk]).to(self.ctx.device)
+            with torch.inference_mode():
+                out.append(self.model.encode_image(x).float().cpu().numpy())
+        return l2n(np.concatenate(out))
+
+    def encode_text(self, prompts):
+        import torch
+        with torch.inference_mode():
+            return self.model.encode_text(self.tok(prompts).to(self.ctx.device)).float().cpu().numpy()
+
+    def trident_encoder(self):
+        import torch
+        from trident.patch_encoder_models import CustomInferenceEncoder
+        M = _ImageModule.make(lambda m, x: m.encode_image(x))
+        return CustomInferenceEncoder("loki", M(self.model), self.preprocess, torch.float32)
+
+
+ADAPTERS = {"conch": ConchAdapter, "musk": MuskAdapter, "keep": KeepAdapter, "plip": PlipAdapter,
+            "quiltnet": QuiltAdapter, "loki": LokiAdapter}
 _cache = {}
 
 

@@ -15,11 +15,31 @@ def mock_dim(model) -> int:
 
 
 def load_encoder(ctx, name: str, **kw):
-    """TRIDENT patch encoder (handles HF download, transforms and precision)."""
-    from trident.patch_encoder_models import encoder_factory
+    """TRIDENT patch encoder (handles HF download, transforms and precision), with HF fallback for hibou_b."""
+    from trident.patch_encoder_models import CustomInferenceEncoder, encoder_factory
     ctx.progress(0.02, f"Loading {name} via TRIDENT encoder_factory")
-    enc = encoder_factory(name, **kw)
-    return enc.eval().to(ctx.device)
+    try:
+        enc = encoder_factory(name, **kw)
+        return enc.eval().to(ctx.device)
+    except (KeyError, ValueError):
+        if name != "hibou_b":
+            raise
+        import torch
+        from transformers import AutoImageProcessor, AutoModel
+        ctx.log("hibou_b not registered in installed TRIDENT version — loading histai/hibou-b via transformers")
+        proc = AutoImageProcessor.from_pretrained("histai/hibou-b", trust_remote_code=True)
+        backbone = AutoModel.from_pretrained("histai/hibou-b", trust_remote_code=True).eval()
+
+        class _HibouB(torch.nn.Module):
+            def __init__(self, m):
+                super().__init__()
+                self.m = m
+
+            def forward(self, x):
+                return self.m(pixel_values=x).pooler_output
+
+        tf = lambda im: proc(images=im, return_tensors="pt")["pixel_values"][0]
+        return CustomInferenceEncoder("hibou_b", _HibouB(backbone), tf, torch.float16).eval().to(ctx.device)
 
 
 def encode_tiles(ctx, enc, imgs, bs: int = 64) -> np.ndarray:

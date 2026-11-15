@@ -29,11 +29,13 @@ jobs:
           assert len(ids) == len(set(ids)), 'Duplicate model IDs in docs/models.json'
           for m in reg['models']:
               assert m['category'] in reg['categories'], m['id']
+              assert m.get('paper_url') and m.get('paper_label'), m['id']
+              assert m.get('species') in ('human', 'multi-species', 'rodent'), m['id']
               for t in m.get('tasks', []):
                   assert t in reg['tasks'], (m['id'], t)
           print(f'Verified {len(ids)} models in registry.')
           "
-      - name: Run 95 model x task mock API tests
+      - name: Run all model x task mock API tests
         env:
           PORTAL_MOCK: "1"
         run: |
