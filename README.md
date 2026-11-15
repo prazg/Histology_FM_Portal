@@ -1,7 +1,7 @@
 # Histology FM Portal
 
 A graphical front end for open-weight histology foundation models. It is a static site that can be hosted on GitHub Pages (`docs/`), plus a small FastAPI inference server (`backend/`) that you run on a GPU machine.
-
+Created and curated by Prajwal Ghimire.
 Choose a model, give it tiles or a whole slide, and the portal returns outputs that match the model type:
 
 | Model family | Outputs in the portal |
@@ -166,3 +166,8 @@ Where a source is silent, the registry says so in `notes`. For example, PLIP and
 
 ## Licence and use
 This portal's code is yours to licence. Each model keeps its own licence, and most are **non-commercial** (CC-BY-NC-ND-4.0 and similar). TRIDENT itself is CC-BY-NC-ND-4.0. For research use only; not for clinical decision-making.
+
+## Build
+Built, created and curated by Prajwal Ghimire
+CopyRight @Prajwal Ghimire
+Contact: prajwal.ghimire@crick.ac.uk
