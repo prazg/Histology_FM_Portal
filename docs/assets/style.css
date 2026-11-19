@@ -21,6 +21,20 @@
   --c-vmif: #0b7f90;
   --c-st: #8a5a2b;
   --c-seg: #3f7f5a;
+  /* dataset modality stains */
+  --d-matched_he_spatial: #8a5a2b;
+  --d-matched_he_if: #0b7f90;
+  --d-matched_other: #c2407a;
+  --d-unmatched_he: #3b3486;
+  --d-unmatched_spatial: #2f7d58;
+  --d-unmatched_tx: #7a3e9d;
+  /* oncology site stains */
+  --cs-brain: #6b3fa0;
+  --cs-lung: #0b7f90;
+  --cs-breast: #c2407a;
+  --cs-prostate: #2b59a8;
+  --cs-pan_cancer: #9a5220;
+  --cs-other_cancer: #57526f;
   --radius-s: 4px;
   --radius-m: 10px;
   --font-ui: "Atkinson Hyperlegible", system-ui, sans-serif;
@@ -35,6 +49,10 @@
     --haem: #8f86ff; --eosin: #ff6fae; --frost: rgba(30,33,60,.78); --focus: #ff6fae;
     --ok: #4fd39a; --warn: #f0a94b; --err: #ff6b74;
     --c-patch: #8f86ff; --c-vl: #ff6fae; --c-slide: #c48cff; --c-vmif: #34d6e8; --c-st: #e0a35f; --c-seg: #6fd39b;
+    --d-matched_he_spatial: #e0a35f; --d-matched_he_if: #34d6e8; --d-matched_other: #ff6fae;
+    --d-unmatched_he: #8f86ff; --d-unmatched_spatial: #6fd39b; --d-unmatched_tx: #c48cff;
+    --cs-brain: #b98eff; --cs-lung: #34d6e8; --cs-breast: #ff6fae;
+    --cs-prostate: #6ea4ff; --cs-pan_cancer: #f0a94b; --cs-other_cancer: #9e9ab8;
     color-scheme: dark;
   }
 }
@@ -44,6 +62,10 @@
   --haem: #8f86ff; --eosin: #ff6fae; --frost: rgba(30,33,60,.78); --focus: #ff6fae;
   --ok: #4fd39a; --warn: #f0a94b; --err: #ff6b74;
   --c-patch: #8f86ff; --c-vl: #ff6fae; --c-slide: #c48cff; --c-vmif: #34d6e8; --c-st: #e0a35f; --c-seg: #6fd39b;
+  --d-matched_he_spatial: #e0a35f; --d-matched_he_if: #34d6e8; --d-matched_other: #ff6fae;
+  --d-unmatched_he: #8f86ff; --d-unmatched_spatial: #6fd39b; --d-unmatched_tx: #c48cff;
+  --cs-brain: #b98eff; --cs-lung: #34d6e8; --cs-breast: #ff6fae;
+  --cs-prostate: #6ea4ff; --cs-pan_cancer: #f0a94b; --cs-other_cancer: #9e9ab8;
   color-scheme: dark;
 }
 
@@ -366,3 +388,91 @@ dialog.wizard::backdrop { background: color-mix(in srgb, var(--ink) 40%, transpa
 .bench-card p { margin: 0; color: var(--ink-2); font-size: .88rem; flex: 1; }
 .bench-links { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 4px; font-size: .84rem; }
 .paper-cite { display: block; color: var(--ink-3); font-size: .8rem; margin-top: 2px; }
+
+/* ── open data view & live repository scanner ───────────────────────────── */
+.mod-matched_he_spatial { --stain: var(--d-matched_he_spatial); }
+.mod-matched_he_if { --stain: var(--d-matched_he_if); }
+.mod-matched_other { --stain: var(--d-matched_other); }
+.mod-unmatched_he { --stain: var(--d-unmatched_he); }
+.mod-unmatched_spatial { --stain: var(--d-unmatched_spatial); }
+.mod-unmatched_tx { --stain: var(--d-unmatched_tx); }
+
+.site-brain { --cs: var(--cs-brain); --stain: var(--cs-brain); }
+.site-lung { --cs: var(--cs-lung); --stain: var(--cs-lung); }
+.site-breast { --cs: var(--cs-breast); --stain: var(--cs-breast); }
+.site-prostate { --cs: var(--cs-prostate); --stain: var(--cs-prostate); }
+.site-pan_cancer { --cs: var(--cs-pan_cancer); --stain: var(--cs-pan_cancer); }
+.site-other_cancer { --cs: var(--cs-other_cancer); --stain: var(--cs-other_cancer); }
+
+.data-controls { display: grid; gap: 10px; margin-bottom: 18px; }
+.cancer-bar {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--paper);
+}
+.cancer-bar-label { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); margin-right: 4px; }
+.cancer-sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
+.cancer-pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border-radius: var(--radius-s);
+  border: 1px solid var(--line); background: var(--glass); color: var(--ink-2); cursor: pointer; font-size: .86rem;
+}
+.cancer-pill.priority { border-color: color-mix(in srgb, var(--cs, var(--haem)) 45%, var(--line)); background: var(--paper); color: var(--ink); }
+.cancer-pill:hover { border-color: var(--ink-2); color: var(--ink); }
+.cancer-pill[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--cs, var(--haem)) 16%, var(--paper));
+  border-color: var(--cs, var(--haem)); color: var(--ink); font-weight: 700;
+  box-shadow: inset 0 -2px 0 var(--cs, var(--haem));
+}
+.cancer-pill .sw { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--cs, var(--haem)); }
+.cancer-pill .n { font-size: .78rem; color: var(--ink-3); font-weight: 400; }
+.cancer-badge {
+  display: inline-flex; align-items: center; gap: 5px; font-size: .74rem; font-weight: 700; line-height: 1.1;
+  padding: 4px 7px; border-radius: 999px; background: color-mix(in srgb, var(--cs, var(--haem)) 13%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--cs, var(--haem)) 48%, transparent); color: var(--ink);
+}
+.cancer-badge i { width: 7px; height: 7px; border-radius: 50%; background: var(--cs, var(--haem)); flex: none; }
+.data-toprow { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.data-toprow .search { flex: 1; min-width: 240px; max-width: 420px; }
+.data-toprow .seg-ctl, .data-subrow .seg-ctl { margin-bottom: 0; }
+.data-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-left: auto; }
+.mod-strip { display: flex; flex-wrap: wrap; gap: 6px; }
+.mod-pill {
+  display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px; border-radius: var(--radius-s);
+  border: 1px solid var(--line); background: var(--paper); color: var(--ink-2); cursor: pointer; font-size: .86rem;
+}
+.mod-pill:hover { border-color: var(--ink-3); color: var(--ink); }
+.mod-pill[aria-pressed="true"] { background: var(--glass-2); color: var(--ink); border-color: var(--ink-2); font-weight: 700; }
+.mod-pill .sw { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.mod-pill .n { font-size: .78rem; color: var(--ink-3); font-weight: 400; }
+.data-subrow { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+
+.mod-badge {
+  display: inline-flex; align-items: center; gap: 6px; font-size: .75rem; font-weight: 700; line-height: 1.1;
+  padding: 4px 7px; border-radius: 3px; background: color-mix(in srgb, var(--stain) 11%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--stain) 42%, transparent); color: var(--ink);
+}
+.mod-badge i { width: 8px; height: 8px; border-radius: 2px; background: var(--stain); flex: none; }
+.assay-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.assay-tag { font-size: .72rem; padding: 2px 6px; border-radius: 3px; background: var(--glass-2); color: var(--ink-2); }
+.hub-badge {
+  display: inline-flex; align-items: center; gap: 4px; font-size: .73rem; padding: 3px 7px; border-radius: 3px;
+  border: 1px solid var(--line); background: var(--glass); color: var(--ink-2); font-weight: 700;
+}
+
+.data-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.data-card {
+  --stain: var(--haem);
+  position: relative; display: flex; flex-direction: column; gap: 8px; padding: 14px 16px 14px 19px;
+  border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--paper); overflow: hidden;
+}
+.data-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--stain); }
+.data-card-head { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.data-card h4 { margin: 0; font-family: var(--font-display); font-size: 1.02rem; line-height: 1.2; }
+.data-card h4 button { border: 0; background: none; padding: 0; text-align: left; cursor: pointer; font: inherit; color: var(--ink); }
+.data-card h4 button:hover { color: var(--haem); text-decoration: underline; }
+.data-card p { margin: 0; font-size: .86rem; color: var(--ink-2); }
+.data-meta { font-size: .8rem; color: var(--ink-3); display: grid; gap: 2px; }
+.data-foot { margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: .83rem; }
+.scan-panel { margin-top: 34px; border-top: 3px solid var(--haem); }
+.scan-form { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin: 10px 0 12px; }
+.scan-form .search { flex: 1; min-width: 240px; max-width: 440px; }
+@media (max-width: 640px) { .data-actions { margin-left: 0; width: 100%; } }

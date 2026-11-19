@@ -4,6 +4,9 @@
   const { h } = Viewers;
   const $ = s => document.querySelector(s);
   const FAM_ORDER = ["patch", "vl", "slide", "vmif", "st", "seg"];
+  const DATA_CANCER_ORDER = ["brain", "lung", "breast", "prostate", "pan_cancer", "other_cancer"];
+  const DATA_MOD_ORDER = ["matched_he_spatial", "matched_he_if", "matched_other", "unmatched_he", "unmatched_spatial", "unmatched_tx"];
+  const DATA_HUB_ORDER = ["huggingface", "zenodo", "scientific_data", "portal"];
   const SPECIES_ORDER = ["rodent", "multi-species", "human"];
   const SPECIES_META = {
     rodent: { label: "Rodent / Preclinical", badge: "Rodent / Preclinical", cls: "sp-rodent", sw: "var(--eosin)" },
@@ -17,11 +20,17 @@
   };
 
   const S = {
-    reg: null, byId: {}, conn: { mode: store.get("fm.mode", "auto"), url: store.get("fm.url", "http://127.0.0.1:8000"), key: store.get("fm.key", ""), hf: "" },
+    reg: null, byId: {}, dataById: {}, conn: { mode: store.get("fm.mode", "auto"), url: store.get("fm.url", "http://127.0.0.1:8000"), key: store.get("fm.key", ""), hf: "" },
     health: null, ready: {}, connected: false, jobs: [], demoJobs: [], selJob: null, poll: null,
     bhw: null, weights: {}, perf: {}, wPoll: null, drawerModel: null, serverFound: null,
     filt: { fam: null, species: null, q: "", commercial: false, ungated: false, ready: false, hw: false },
     papers: { q: "", species: null },
+    data: {
+      q: "", cancer: "", mod: "", hub: "", species: "", commercial: false, ungated: false, view: "table",
+      liveQ: "glioblastoma OR lung OR breast OR prostate cancer spatial transcriptomics H&E",
+      liveHubs: { huggingface: true, zenodo: true, scientific_data: true },
+      liveCancerOnly: true, liveItems: null, liveErrors: [], liveBusy: false,
+    },
     run: { model: null, task: null, src: "path", tiles: [] },
   };
   try { S.conn.hf = sessionStorage.getItem("fm.hf") || ""; } catch { /* */ }
@@ -72,16 +81,25 @@
     const titlePart = rest.length ? rest.join(",").replace(/\(\d{4}\)\s*$/, "").trim() : m.name;
     return `@article{${key}_${yr},\n  author  = {${(authPart || m.developer).trim()}},\n  title   = {${titlePart}},\n  journal = {${m.paper_label || "Preprint"}},\n  year    = {${yr}},\n  url     = {${m.paper_url || m.link || ""}}\n}`;
   }
+  function bibtexForDataset(d) {
+    const key = "data_" + d.id.replace(/[^a-zA-Z0-9_]/g, "_");
+    const yr = ((d.citation || d.paper_label || "").match(/\b(19|20)\d{2}\b/) || ["2025"])[0];
+    const cite = d.citation || `${d.developer}, ${d.name}`;
+    const [authPart, ...rest] = cite.split(",");
+    const titlePart = rest.length ? rest.join(",").replace(/\(\d{4}\)\s*$/, "").trim() : d.name;
+    return `@misc{${key}_${yr},\n  author       = {${(authPart || d.developer).trim()}},\n  title        = {${titlePart}},\n  howpublished = {${d.source_label}: ${d.data_url}},\n  note         = {${d.paper_label || "Open dataset"}},\n  year         = {${yr}},\n  url          = {${d.paper_url || d.data_url}}\n}`;
+  }
 
   // ── routing ──────────────────────────────────────────────────────────
   function route() {
     const [view, arg] = (location.hash.slice(1) || "models").split("/");
-    const v = ["models", "run", "results", "papers", "connect"].includes(view) ? view : "models";
+    const v = ["models", "run", "results", "papers", "data", "connect"].includes(view) ? view : "models";
     document.querySelectorAll("main > section").forEach(s => (s.hidden = s.id !== "view-" + v));
     document.querySelectorAll("nav.tabs button").forEach(b => b.dataset.view === v ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
     if (v === "run") { if (arg && S.byId[decodeURIComponent(arg)]) selectModel(decodeURIComponent(arg)); else if (!S.run.model) selectModel(S.reg.models.find(m => m.runner)?.id); }
     if (v === "results") { if (arg) S.selJob = decodeURIComponent(arg); refreshJobs(); }
     if (v === "papers") renderPapers();
+    if (v === "data") { renderData(); if (arg && S.dataById[decodeURIComponent(arg)]) openDatasetDrawer(S.dataById[decodeURIComponent(arg)]); }
     if (v === "connect") renderConnect();
     window.scrollTo({ top: 0 });
   }
@@ -238,11 +256,20 @@
         m.channels ? h("details", {}, h("summary", { text: `${m.channels.length} output channels` }), h("p", { class: "small", text: m.channels.join(", ") })) : null,
         (m.tasks || []).length ? h("div", {}, h("h3", { text: "Tasks and outputs", style: "margin-bottom:8px" }),
           h("ul", { class: "small", style: "margin:0;padding-left:1.1em" }, m.tasks.map(t => h("li", {}, h("strong", { text: S.reg.tasks[t].label }), " — ", S.reg.tasks[t].outputs.join("; "))))) : null,
+        (() => {
+          const compat = (S.reg.open_datasets || []).filter(ds => (ds.compatible_models || []).includes(m.id));
+          if (!compat.length) return null;
+          return h("div", {}, h("h3", { text: "Compatible open-access oncology datasets", style: "margin-bottom:8px" }),
+            h("div", { class: "chips", style: "margin-bottom:0" }, compat.map(ds => h("button", {
+              type: "button", class: "btn ghost small",
+              onclick: () => { d.close(); go("data/" + encodeURIComponent(ds.id)); }
+            }, `${ds.name} · ${(S.reg.dataset_cancer_sites && S.reg.dataset_cancer_sites[ds.cancer_site] ? S.reg.dataset_cancer_sites[ds.cancer_site].short + " · " : "")}${(S.reg.dataset_modalities[ds.modality_group] || {}).short || ds.regime}`))));
+        })(),
         cli ? h("details", {}, h("summary", { class: "small", text: "Python / CLI quickstart" }), cliBlock(cli)) : null,
         m.runner ? h("div", { style: "display:flex;gap:10px;flex-wrap:wrap" },
           h("button", { class: "btn", onclick: () => { d.close(); go("run/" + encodeURIComponent(m.id)); } }, `Run ${m.name}`),
           m.paper_url ? h("a", { class: "btn ghost", href: m.paper_url, target: "_blank", rel: "noopener" }, "Read paper") : null) : null));
-    if (!keepOpen) d.showModal();
+    if (!d.open && !keepOpen) d.showModal();
   }
   $("#drawer").addEventListener("click", e => { if (e.target.id === "drawer") e.target.close(); });
   $("#drawer").addEventListener("close", () => { S.drawerModel = null; });
@@ -869,11 +896,434 @@
         h("div", { class: "bench-grid" }, refs)) : null);
   }
 
+  // ── open data catalogue & live repository scanner (oncology) ─────────
+  const SCAN_PRESETS = [
+    ["★ Brain (GBM / Glioma)", "glioblastoma OR glioma histopathology spatial transcriptomics H&E"],
+    ["★ Lung (NSCLC / LUAD)", "lung cancer OR NSCLC histopathology spatial transcriptomics immunofluorescence"],
+    ["★ Breast (BRCA / HER2 / TNBC)", "breast cancer histopathology spatial transcriptomics immunofluorescence H&E"],
+    ["★ Prostate (PRAD / Gleason)", "prostate cancer histopathology Gleason spatial transcriptomics IHC"],
+    ["Pan-Cancer Spatial + H&E", "pan-cancer spatial transcriptomics H&E whole slide"],
+    ["Cancer H&E + Multiplex IF", "cancer tumor multiplex immunofluorescence H&E co-registered"],
+  ];
+
+  const modMeta = k => (S.reg && S.reg.dataset_modalities && S.reg.dataset_modalities[k]) || { label: k, short: k, regime: "unmatched", blurb: "" };
+  const modBadge = k => h("span", { class: `mod-badge mod-${k}`, title: modMeta(k).blurb }, h("i"), modMeta(k).short || modMeta(k).label);
+  const cancerMeta = k => (S.reg && S.reg.dataset_cancer_sites && S.reg.dataset_cancer_sites[k]) || { label: k, short: k, scope: "organ_specific", priority: false, blurb: "" };
+  const cancerBadge = k => h("span", { class: `cancer-badge site-${k}`, title: cancerMeta(k).blurb }, h("i"), cancerMeta(k).short || cancerMeta(k).label);
+
+  function isCancerRelatedLive(txt) {
+    return /cancer|carcinoma|tumou?r|oncolog|glioblastoma|\bgbm\b|glioma|adenocarcinoma|sarcoma|melanoma|lymphoma|leukemia|neoplasm|malignan|metasta|\bnsclc\b|\bluad\b|\blusc\b|\bbrca\b|\bprad\b|\bddcis\b|\bdcis\b|\btnbc\b|gleason|her2|tcga|cptac/i.test(String(txt || ""));
+  }
+
+  function classifyCancerSiteLive(txt) {
+    const t = String(txt || "").toLowerCase();
+    const hits = [];
+    if (/glioblastoma|\bgbm\b|glioma|astrocytoma|oligodendroglioma|medulloblastoma|meningioma|brain tumou?r|neuro-oncol|\bcns tumou?r/.test(t)) hits.push("brain");
+    if (/lung cancer|lung adenocarcinoma|lung squamous|\bnsclc\b|\bsclc\b|\bluad\b|\blusc\b|thoracic tumou?r|pulmonary carcinoma/.test(t)) hits.push("lung");
+    if (/breast cancer|breast carcinoma|mammary carcinoma|\bbrca\b|\bdcis\b|\btnbc\b|her2[\s+-]*positive breast|metabric/.test(t)) hits.push("breast");
+    if (/prostate cancer|prostate adenocarcinoma|prostatic carcinoma|\bprad\b|gleason|prostatectomy|\bcrpc\b/.test(t)) hits.push("prostate");
+    if (/pan[- ]?cancer|multi[- ]?organ cancer|33 cancer|across cancer types|multiple cancer/.test(t) || hits.length > 1) return "pan_cancer";
+    return hits[0] || "other_cancer";
+  }
+
+  function classifyModalityLive(txt) {
+    const t = String(txt || "").toLowerCase();
+    const he = /\bh\s*&\s*e\b|\bh&e\b|hematoxylin|haematoxylin|histopatholog|whole[- ]slide|\bwsi\b|brightfield/.test(t);
+    const st = /spatial transcriptom|visium|xenium|merfish|cosmx|slide-seq|stereo-seq|st-seq|10x spatial/.test(t);
+    const mif = /immunofluorescen|\bmif\b|cycif|codex|phenocycler|multiplex ihc|\bmihc\b|immunohistochem|\bihc\b|\bimc\b|mass cytometry/.test(t);
+    const tx = /rna-seq|rnaseq|scrna|snrna|transcriptom|gene expression|single-cell rna|perturbation atlas/.test(t);
+    const vqa = /image-text|vision-language|\bvqa\b|caption|pathology report/.test(t);
+    if (he && st && mif) return "matched_other";
+    if (he && st) return "matched_he_spatial";
+    if (he && mif) return "matched_he_if";
+    if (he && (tx || vqa)) return "matched_other";
+    if (st || (mif && !he)) return "unmatched_spatial";
+    if (tx && !he) return "unmatched_tx";
+    return "unmatched_he";
+  }
+
+  function matchesCancerFilter(d, cf) {
+    if (!cf) return true;
+    if (cf === "organ_specific") return d.cancer_scope === "organ_specific";
+    if (cf === "pan_cancer") return d.cancer_scope === "pan_cancer";
+    return d.cancer_site === cf;
+  }
+
+  function openDatasetDrawer(ds, keepOpen) {
+    const d = $("#drawer");
+    S.drawerModel = null;
+    const mm = modMeta(ds.modality_group);
+    const cm = cancerMeta(ds.cancer_site);
+    const spLabel = (SPECIES_META[ds.species] || SPECIES_META.human).label;
+    const bibBtn = h("button", { type: "button", class: "btn ghost small", style: "margin-left:8px", onclick: () => copyText(bibtexForDataset(ds), bibBtn) }, "Copy BibTeX");
+    const compatModels = (ds.compatible_models || []).map(id => S.byId[id]).filter(Boolean);
+    const rows = [
+      ["Cancer scope", `${ds.cancer_scope === "pan_cancer" ? "Pan-Cancer" : "Organ-Specific"} — ${cm.label}`],
+      ["Tumour entities", ds.tumor_types || ds.organs],
+      ["Modality group", mm.label],
+      ["Regime", ds.regime === "matched" ? "Matched / paired multimodal" : "Unmatched single-modality"],
+      ["Assays & channels", (ds.modalities || []).join(" · ")],
+      ["Co-registration", ds.pairing],
+      ["Scale", ds.scale],
+      ["Species & cohort", `${spLabel} — ${ds.organs}`],
+      ["Originating group", ds.developer],
+      ["Primary deposit", h("span", {}, h("a", { href: ds.data_url, target: "_blank", rel: "noopener", text: `${ds.source_label} (${ds.data_url.replace(/^https?:\/\//, "").slice(0, 48)})` }))],
+      ["Paper / descriptor", h("span", {}, h("a", { href: ds.paper_url, target: "_blank", rel: "noopener", text: ds.paper_label }), bibBtn,
+        ds.citation ? h("span", { class: "paper-cite", text: ds.citation }) : null)],
+      ["Licence", `${ds.licence} (${ds.commercial_use ? "commercial use allowed" : "academic / non-commercial terms"})`],
+      ["Access", ds.gated ? "Terms / DUA acceptance required on host repository" : "Open direct download"],
+    ];
+    d.replaceChildren(
+      h("div", { class: `drawer-head site-${ds.cancer_site}` },
+        h("p", { class: "small muted", style: "margin:0 0 4px", text: `${cm.short} · ${mm.label} · ${ds.source_label}` }),
+        h("h2", { id: "drawerTitle", text: ds.name }),
+        h("button", { class: "icon-btn close-x", "aria-label": "Close", onclick: () => d.close() }, "✕")),
+      h("div", { class: "drawer-body" },
+        h("dl", { class: "kv" }, rows.flatMap(([k, v]) => [h("dt", { text: k }), h("dd", {}, v)])),
+        ds.description ? h("div", { class: "notice info", text: ds.description }) : null,
+        ds.cli ? h("div", {}, h("h3", { text: "Download / Python quickstart", style: "margin-bottom:8px" }), cliBlock(ds.cli)) : null,
+        compatModels.length ? h("div", {},
+          h("h3", { text: "Use with models in this portal", style: "margin-bottom:6px" }),
+          h("p", { class: "small muted", style: "margin-bottom:8px", text: "Click a model to inspect its requirements or launch local inference on downloaded cancer tiles/slides." }),
+          h("div", { class: "chips", style: "margin-bottom:0" }, compatModels.map(m =>
+            h("button", { type: "button", class: "btn ghost small", onclick: () => openDrawer(m, d.open) }, `${m.name} (${famLabel(m.category)})`)))) : null,
+        h("div", { style: "display:flex;gap:10px;flex-wrap:wrap" },
+          h("a", { class: "btn", href: ds.data_url, target: "_blank", rel: "noopener", style: "text-decoration:none" }, "Open data deposit ↗"),
+          h("a", { class: "btn ghost", href: ds.paper_url, target: "_blank", rel: "noopener", style: "text-decoration:none" }, `Read ${ds.paper_label} ↗`))));
+    if (!d.open && !keepOpen) d.showModal();
+  }
+
+  function exportDatasetsJson(list) {
+    const blob = new Blob([JSON.stringify(list, null, 2)], { type: "application/json" });
+    const a = h("a", { href: URL.createObjectURL(blob), download: "oncology_open_datasets.json" });
+    document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+
+  async function fetchJsonTimeout(url, ms = 12000) {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), ms);
+    try {
+      const r = await fetch(url, { signal: ctl.signal, headers: { Accept: "application/json" } });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return await r.json();
+    } finally { clearTimeout(timer); }
+  }
+
+  async function liveScanRepositories(onUpdate) {
+    const q = (S.data.liveQ || "").trim();
+    if (!q || S.data.liveBusy) return;
+    const hubs = S.data.liveHubs;
+    if (!hubs.huggingface && !hubs.zenodo && !hubs.scientific_data) {
+      S.data.liveErrors = ["Select at least one repository hub to scan."]; onUpdate(); return;
+    }
+    S.data.liveBusy = true; S.data.liveErrors = []; onUpdate();
+    const tasks = [];
+    if (hubs.huggingface) {
+      tasks.push(fetchJsonTimeout(`https://huggingface.co/api/datasets?search=${encodeURIComponent(q)}&limit=10&sort=downloads&direction=-1&full=true`)
+        .then(arr => (Array.isArray(arr) ? arr : []).map(it => {
+          const card = it.cardData || {};
+          const desc = String(it.description || card.pretty_name || "").replace(/\s+/g, " ").trim().slice(0, 260);
+          const tags = it.tags || [];
+          const fullTxt = `${it.id} ${desc} ${tags.join(" ")}`;
+          const lic = card.license || (tags.find(t => t.startsWith("license:")) || "").slice(8) || "See card";
+          return {
+            hub: "Hugging Face", mod: classifyModalityLive(fullTxt), site: classifyCancerSiteLive(fullTxt),
+            cancerOk: isCancerRelatedLive(fullTxt), title: card.pretty_name || it.id, sub: it.id,
+            url: `https://huggingface.co/datasets/${it.id}`,
+            licence: Array.isArray(lic) ? lic.join(", ") : String(lic),
+            metric: `${(it.downloads || 0).toLocaleString()} downloads · ${it.likes || 0} likes`,
+            date: String(it.lastModified || "").slice(0, 10), desc,
+          };
+        })).catch(e => { S.data.liveErrors.push(`Hugging Face: ${e.message}`); return []; }));
+    }
+    if (hubs.zenodo) {
+      tasks.push(fetchJsonTimeout(`https://zenodo.org/api/records?q=${encodeURIComponent(q)}&type=dataset&size=10&sort=bestmatch`)
+        .then(res => (((res || {}).hits || {}).hits || []).filter(x => ((x.metadata || {}).access_right || "open") === "open").map(x => {
+          const m = x.metadata || {};
+          const raw = String(m.description || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 260);
+          const fullTxt = `${m.title || ""} ${raw} ${(m.keywords || []).join(" ")}`;
+          const doi = x.doi || m.doi || `10.5281/zenodo.${x.id}`;
+          return {
+            hub: "Zenodo", mod: classifyModalityLive(fullTxt), site: classifyCancerSiteLive(fullTxt),
+            cancerOk: isCancerRelatedLive(fullTxt), title: m.title || x.title || `Zenodo ${x.id}`,
+            sub: ((m.creators || []).slice(0, 2).map(c => c.name).join(", ")) || doi,
+            url: String(doi).startsWith("http") ? doi : `https://doi.org/${doi}`,
+            licence: (m.license && m.license.id) || "Open Access",
+            metric: `DOI ${doi}`, date: String(m.publication_date || x.created || "").slice(0, 10), desc: raw,
+          };
+        })).catch(e => { S.data.liveErrors.push(`Zenodo: ${e.message}`); return []; }));
+    }
+    if (hubs.scientific_data) {
+      const eq = `ISSN:"2052-4463" AND (${q}) AND OPEN_ACCESS:Y`;
+      tasks.push(fetchJsonTimeout(`https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${encodeURIComponent(eq)}&format=json&pageSize=10&resultType=core`)
+        .then(res => (((res || {}).resultList || {}).result || []).map(r => {
+          const title = String(r.title || "").replace(/<[^>]+>/g, "").trim();
+          const desc = String(r.abstractText || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 260);
+          const fullTxt = `${title} ${desc}`;
+          const doi = r.doi || "";
+          return {
+            hub: "Scientific Data", mod: classifyModalityLive(fullTxt), site: classifyCancerSiteLive(fullTxt),
+            cancerOk: isCancerRelatedLive(fullTxt), title, sub: `${String(r.authorString || "").slice(0, 48)} (${r.pubYear || ""})`,
+            url: doi ? `https://doi.org/${doi}` : `https://europepmc.org/article/${r.source || "MED"}/${r.id || ""}`,
+            licence: "CC-BY-4.0", metric: `${doi || r.id} · cited ${r.citedByCount || 0}`,
+            date: r.firstPublicationDate || String(r.pubYear || ""), desc,
+          };
+        })).catch(e => { S.data.liveErrors.push(`Scientific Data (Europe PMC): ${e.message}`); return []; }));
+    }
+    const settled = await Promise.all(tasks);
+    const rawItems = settled.flat();
+    S.data.liveItems = S.data.liveCancerOnly ? rawItems.filter(x => x.cancerOk) : rawItems;
+    S.data.liveBusy = false;
+    onUpdate();
+  }
+
+  function renderDatasetCard(d) {
+    const bBtn = h("button", { type: "button", class: "btn ghost small", onclick: () => copyText(bibtexForDataset(d), bBtn) }, "BibTeX");
+    return h("div", { class: `data-card site-${d.cancer_site}` },
+      h("div", { class: "data-card-head" },
+        h("div", {}, h("h4", {}, h("button", { type: "button", onclick: () => openDatasetDrawer(d) }, d.name)),
+          h("span", { class: "small muted", text: d.developer })),
+        h("span", { class: "hub-badge", text: d.source_label })),
+      h("div", { style: "display:flex;gap:6px;flex-wrap:wrap;align-items:center" },
+        cancerBadge(d.cancer_site), modBadge(d.modality_group)),
+      h("div", { class: "assay-tags" }, (d.modalities || []).map(a => h("span", { class: "assay-tag", text: a }))),
+      h("p", { text: d.description }),
+      h("div", { class: "data-meta" },
+        h("span", {}, h("strong", { text: "Tumours: " }), d.tumor_types || d.organs),
+        h("span", {}, h("strong", { text: "Pairing: " }), d.pairing),
+        h("span", {}, h("strong", { text: "Scale: " }), d.scale)),
+      h("div", { style: "display:flex;gap:5px;flex-wrap:wrap" },
+        speciesBadge(d) || h("span", { class: "badge", text: "Human oncology" }),
+        h("span", { class: "badge " + (d.commercial_use ? "free" : "nc"), text: d.commercial_use ? d.licence : "Non-commercial" }),
+        d.gated ? h("span", { class: "badge", text: "Terms / DUA" }) : null),
+      h("div", { class: "data-foot" },
+        h("a", { href: d.data_url, target: "_blank", rel: "noopener", style: "font-weight:700", text: "Deposit ↗" }),
+        h("a", { href: d.paper_url, target: "_blank", rel: "noopener", text: d.paper_label + " ↗" }),
+        h("span", { style: "margin-left:auto;display:flex;gap:6px" },
+          h("button", { type: "button", class: "btn ghost small", onclick: () => openDatasetDrawer(d) }, "CLI & Models"),
+          bBtn)));
+  }
+
+  function renderData() {
+    const box = $("#dataView");
+    if (!box || !S.reg) return;
+    const all = S.reg.open_datasets || [];
+    const countsBox = $("#dataCounts");
+    if (countsBox) {
+      const prioCount = all.filter(d => ["brain", "lung", "breast", "prostate"].includes(d.cancer_site)).length;
+      countsBox.replaceChildren(
+        h("div", {}, h("b", { text: all.length }), "cancer datasets"),
+        h("div", {}, h("b", { text: all.filter(d => d.cancer_scope === "pan_cancer").length }), "pan-cancer cohorts"),
+        h("div", {}, h("b", { text: prioCount }), "Brain · Lung · Breast · Prostate"),
+        h("div", {}, h("b", { text: all.filter(d => d.regime === "matched").length }), "matched multimodal"));
+    }
+
+    const cancerBar = h("div", { class: "cancer-bar", role: "group", "aria-label": "Cancer scope and priority organ filter" });
+    const searchIn = h("input", { class: "search", type: "search", value: S.data.q,
+      placeholder: "Search tumour type (GBM, LUAD, HER2, TNBC, Gleason), assay (Visium, Xenium, CyCIF, IMC, scRNA) or DOI…" });
+    const hubWrap = h("div", { class: "seg-ctl", role: "group", "aria-label": "Repository hub" });
+    const modStrip = h("div", { class: "mod-strip", role: "group", "aria-label": "Modality and pairing regime" });
+    const viewWrap = h("div", { class: "seg-ctl", role: "group", "aria-label": "Layout" });
+    const copyBibBtn = h("button", { type: "button", class: "btn ghost small" });
+    const exportBtn = h("button", { type: "button", class: "btn ghost small" }, "Export JSON");
+    const chkComm = h("input", { type: "checkbox" }); chkComm.checked = S.data.commercial;
+    const chkOpen = h("input", { type: "checkbox" }); chkOpen.checked = S.data.ungated;
+    const resultsHolder = h("div");
+
+    const filterData = () => {
+      const f = S.data, q = f.q.toLowerCase();
+      return all.filter(d => {
+        if (!matchesCancerFilter(d, f.cancer)) return false;
+        if (f.mod === "matched" && d.regime !== "matched") return false;
+        if (f.mod === "unmatched" && d.regime !== "unmatched") return false;
+        if (f.mod && !["matched", "unmatched"].includes(f.mod) && d.modality_group !== f.mod) return false;
+        if (f.hub && !(d.hubs || [d.source_hub]).includes(f.hub)) return false;
+        if (f.species && d.species !== f.species) return false;
+        if (f.commercial && !d.commercial_use) return false;
+        if (f.ungated && d.gated) return false;
+        if (!q) return true;
+        const modelNames = (d.compatible_models || []).map(id => (S.byId[id] || {}).name || id).join(" ");
+        const hay = [d.name, d.developer, cancerMeta(d.cancer_site).label, d.cancer_scope, d.tumor_types,
+          modMeta(d.modality_group).label, d.regime, (d.modalities || []).join(" "),
+          d.pairing, d.source_label, d.organs, d.scale, d.licence, d.paper_label, d.citation, d.description, d.data_url, modelNames].join(" ").toLowerCase();
+        return hay.includes(q);
+      });
+    };
+
+    const drawCatalogue = () => {
+      const list = filterData();
+      const cancerScoped = all.filter(d => matchesCancerFilter(d, S.data.cancer));
+      copyBibBtn.textContent = `Copy BibTeX (${list.length})`;
+      copyBibBtn.onclick = () => copyText(list.map(bibtexForDataset).join("\n\n"), copyBibBtn);
+      exportBtn.onclick = () => exportDatasetsJson(list);
+
+      const mkCancerPill = (key, label, count, cls = "", isPrio = false) => h("button", {
+        type: "button", class: `cancer-pill ${cls}${isPrio ? " priority" : ""}`.trim(),
+        "aria-pressed": String(S.data.cancer === key),
+        onclick: () => { S.data.cancer = S.data.cancer === key && key ? "" : key; drawCatalogue(); }
+      }, cls ? h("span", { class: "sw" }) : null, label, h("span", { class: "n", text: String(count) }));
+
+      cancerBar.replaceChildren(
+        h("span", { class: "cancer-bar-label", text: "Scope" }),
+        mkCancerPill("", "All Cancers", all.length),
+        mkCancerPill("pan_cancer", "Pan-Cancer", all.filter(d => d.cancer_scope === "pan_cancer").length, "site-pan_cancer", true),
+        mkCancerPill("organ_specific", "Organ-Specific", all.filter(d => d.cancer_scope === "organ_specific").length),
+        h("span", { class: "cancer-sep", "aria-hidden": "true" }),
+        h("span", { class: "cancer-bar-label", text: "Priority Organs" }),
+        ...["brain", "lung", "breast", "prostate"].map(s =>
+          mkCancerPill(s, `★ ${cancerMeta(s).short}`, all.filter(d => d.cancer_site === s).length, `site-${s}`, true)),
+        h("span", { class: "cancer-sep", "aria-hidden": "true" }),
+        mkCancerPill("other_cancer", cancerMeta("other_cancer").short, all.filter(d => d.cancer_site === "other_cancer").length, "site-other_cancer"));
+
+      const hubTabs = [["", `All hubs (${cancerScoped.length})`], ...DATA_HUB_ORDER.map(k => [
+        k, `${S.reg.dataset_hubs[k]} (${cancerScoped.filter(d => (d.hubs || [d.source_hub]).includes(k)).length})`])];
+      hubWrap.replaceChildren(...hubTabs.map(([k, l]) => h("button", { type: "button", "aria-pressed": String(S.data.hub === k),
+        onclick: () => { S.data.hub = k; drawCatalogue(); } }, l)));
+
+      const modOptions = [
+        ["", "All modalities", cancerScoped.length, "linear-gradient(135deg,var(--haem),var(--eosin))"],
+        ["matched", "All Matched", cancerScoped.filter(d => d.regime === "matched").length, "var(--eosin)"],
+        ["unmatched", "All Unmatched", cancerScoped.filter(d => d.regime === "unmatched").length, "var(--haem)"],
+        ...DATA_MOD_ORDER.map(k => [k, modMeta(k).short || modMeta(k).label, cancerScoped.filter(d => d.modality_group === k).length, `var(--d-${k})`]),
+      ];
+      modStrip.replaceChildren(...modOptions.map(([k, l, n, sw]) => h("button", {
+        type: "button", class: "mod-pill", "aria-pressed": String(S.data.mod === k),
+        onclick: () => { S.data.mod = S.data.mod === k && k ? "" : k; drawCatalogue(); }
+      }, h("span", { class: "sw", style: `background:${sw}` }), l, h("span", { class: "n", text: String(n) }))));
+
+      viewWrap.replaceChildren(...[["table", "Table"], ["by_site", "By Cancer Site"], ["by_mod", "By Modality"]].map(([k, l]) => h("button", {
+        type: "button", "aria-pressed": String(S.data.view === k),
+        onclick: () => { S.data.view = k; drawCatalogue(); } }, l)));
+
+      if (!list.length) {
+        resultsHolder.replaceChildren(h("div", { class: "empty" }, "No cancer datasets match these filters. ",
+          h("button", { type: "button", class: "btn ghost small", onclick: () => {
+            Object.assign(S.data, { q: "", cancer: "", mod: "", hub: "", species: "", commercial: false, ungated: false });
+            searchIn.value = ""; chkComm.checked = false; chkOpen.checked = false; drawCatalogue();
+          } }, "Clear filters")));
+        return;
+      }
+
+      if (S.data.view === "table") {
+        const rows = list.map(d => {
+          const bBtn = h("button", { type: "button", class: "btn ghost small", onclick: () => copyText(bibtexForDataset(d), bBtn) }, "BibTeX");
+          const cliBtn = h("button", { type: "button", class: "btn ghost small", onclick: () => openDatasetDrawer(d) }, "CLI / Info");
+          return h("tr", {},
+            h("td", {},
+              h("button", { type: "button", class: "btn ghost small", style: "font-weight:700;padding:2px 6px;text-align:left", onclick: () => openDatasetDrawer(d) }, d.name),
+              h("span", { class: "paper-cite", text: d.developer })),
+            h("td", {}, cancerBadge(d.cancer_site), h("span", { class: "paper-cite", text: d.tumor_types || d.organs })),
+            h("td", {}, modBadge(d.modality_group), h("span", { class: "paper-cite", text: d.pairing })),
+            h("td", {}, h("div", { class: "assay-tags" }, (d.modalities || []).map(a => h("span", { class: "assay-tag", text: a })))),
+            h("td", {},
+              h("a", { href: d.data_url, target: "_blank", rel: "noopener", style: "font-weight:700", text: d.source_label + " ↗" }),
+              h("span", { class: "paper-cite" }, h("a", { href: d.paper_url, target: "_blank", rel: "noopener", text: d.paper_label }))),
+            h("td", {},
+              h("div", { style: "display:flex;gap:4px;flex-wrap:wrap;margin-bottom:3px" },
+                h("span", { class: "badge " + (d.commercial_use ? "free" : "nc"), title: d.licence, text: d.commercial_use ? d.licence : "Non-commercial" }),
+                d.gated ? h("span", { class: "badge", text: "DUA / Gated" }) : null),
+              h("span", { class: "paper-cite", text: d.scale })),
+            h("td", {}, h("div", { style: "display:flex;gap:6px;flex-wrap:wrap" }, cliBtn, bBtn)));
+        });
+        resultsHolder.replaceChildren(
+          h("div", { class: "card", style: "padding:0;overflow:hidden" },
+            h("div", { class: "table-wrap", style: "max-height:640px" },
+              h("table", { class: "data" },
+                h("thead", {}, h("tr", {}, ["Dataset", "Cancer site & subtype", "Modality & pairing", "Assays", "Deposit & paper", "Scale & licence", "Actions"].map(c => h("th", { text: c })))),
+                h("tbody", {}, rows)))));
+      } else if (S.data.view === "by_site") {
+        resultsHolder.replaceChildren(...DATA_CANCER_ORDER.filter(k => list.some(d => d.cancer_site === k)).map(k => {
+          const cm = cancerMeta(k);
+          return h("div", { class: "fam-block" },
+            h("div", { class: "fam-head" }, h("span", { class: "sw", style: `background:var(--cs-${k});border-radius:50%` }),
+              h("h2", { text: (cm.priority && k !== "pan_cancer" ? "★ " : "") + cm.label }), h("p", { text: cm.blurb })),
+            h("div", { class: "data-grid" }, list.filter(d => d.cancer_site === k).map(renderDatasetCard)));
+        }));
+      } else {
+        resultsHolder.replaceChildren(...DATA_MOD_ORDER.filter(k => list.some(d => d.modality_group === k)).map(k => {
+          const mm = modMeta(k);
+          return h("div", { class: "fam-block" },
+            h("div", { class: "fam-head" }, h("span", { class: "sw", style: `background:var(--d-${k})` }), h("h2", { text: mm.label }), h("p", { text: mm.blurb })),
+            h("div", { class: "data-grid" }, list.filter(d => d.modality_group === k).map(renderDatasetCard)));
+        }));
+      }
+    };
+
+    searchIn.addEventListener("input", e => { S.data.q = e.target.value; drawCatalogue(); });
+    chkComm.addEventListener("change", () => { S.data.commercial = chkComm.checked; drawCatalogue(); });
+    chkOpen.addEventListener("change", () => { S.data.ungated = chkOpen.checked; drawCatalogue(); });
+    drawCatalogue();
+
+    // Live oncology repository scanner (Zenodo + Scientific Data + Hugging Face)
+    const liveBox = h("div", { class: "card scan-panel" });
+    const drawScanner = () => {
+      const qIn = h("input", { class: "search", type: "search", value: S.data.liveQ, placeholder: "Query oncology datasets on Zenodo, Scientific Data & Hugging Face…" });
+      qIn.addEventListener("input", e => { S.data.liveQ = e.target.value; });
+      qIn.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); liveScanRepositories(drawScanner); } });
+      const hubChecks = [["huggingface", "Hugging Face"], ["zenodo", "Zenodo"], ["scientific_data", "Scientific Data"]].map(([k, lbl]) => {
+        const c = h("input", { type: "checkbox" }); c.checked = !!S.data.liveHubs[k];
+        c.addEventListener("change", () => { S.data.liveHubs[k] = c.checked; });
+        return h("label", { class: "check", style: "padding:0" }, c, lbl);
+      });
+      const cancerChk = h("input", { type: "checkbox" }); cancerChk.checked = !!S.data.liveCancerOnly;
+      cancerChk.addEventListener("change", () => { S.data.liveCancerOnly = cancerChk.checked; });
+      const scanBtn = h("button", { type: "button", class: "btn small", onclick: () => liveScanRepositories(drawScanner) },
+        S.data.liveBusy ? "Scanning APIs…" : "Scan live");
+      scanBtn.disabled = S.data.liveBusy;
+
+      let liveOut = null;
+      if (S.data.liveItems) {
+        liveOut = S.data.liveItems.length
+          ? h("div", { class: "bench-grid", style: "margin-top:12px" }, S.data.liveItems.map(it =>
+              h("div", { class: "bench-card" },
+                h("div", { style: "display:flex;justify-content:space-between;gap:6px;align-items:flex-start;flex-wrap:wrap" },
+                  h("span", { style: "display:flex;gap:5px;flex-wrap:wrap" }, cancerBadge(it.site), modBadge(it.mod)),
+                  h("span", { class: "hub-badge", text: it.hub })),
+                h("h4", { style: "margin-top:4px" }, h("a", { href: it.url, target: "_blank", rel: "noopener", text: it.title })),
+                it.sub ? h("span", { class: "small muted", text: it.sub }) : null,
+                it.desc ? h("p", { text: it.desc }) : null,
+                h("div", { class: "bench-links", style: "justify-content:space-between" },
+                  h("span", { class: "small muted", text: `${it.metric}${it.date ? " · " + it.date : ""}` }),
+                  h("span", { class: "badge", text: it.licence })))))
+          : h("p", { class: "small muted", style: "margin-top:10px", text: "No open-access cancer datasets returned for this query." });
+      }
+
+      liveBox.replaceChildren(
+        h("div", { style: "display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline" },
+          h("h3", { text: "Live oncology repository scanner — Zenodo · Scientific Data · Hugging Face" }),
+          h("span", { class: "small muted", text: "Queries public CORS APIs directly from your browser" })),
+        h("p", { class: "small muted", style: "margin-bottom:8px",
+          text: "Scan for newly deposited Brain, Lung, Breast, Prostate, or Pan-Cancer histopathology, spatial omics, mIF, and transcriptomic datasets." }),
+        h("div", { class: "chips" }, SCAN_PRESETS.map(([lbl, pq]) => h("button", { type: "button", class: "btn ghost small",
+          onclick: () => { S.data.liveQ = pq; liveScanRepositories(drawScanner); } }, lbl))),
+        h("div", { class: "scan-form" }, qIn, ...hubChecks, h("label", { class: "check", style: "padding:0" }, cancerChk, "Cancer-only filter"), scanBtn),
+        S.data.liveErrors.length ? h("div", { class: "notice small", style: "margin-bottom:10px",
+          text: "Some endpoints could not be reached from this network: " + S.data.liveErrors.join("; ") }) : null,
+        liveOut,
+        h("details", { style: "margin-top:12px" },
+          h("summary", { class: "small", text: "Run the oncology scanner from the command line" }),
+          cliBlock(`python backend/scan_open_data.py --cancer brain\npython backend/scan_open_data.py --cancer lung\npython backend/scan_open_data.py --cancer breast\npython backend/scan_open_data.py --cancer prostate\npython backend/scan_open_data.py --all-priority --out cancer_data_candidates.json`)));
+    };
+    drawScanner();
+
+    box.replaceChildren(
+      h("div", { class: "data-controls" },
+        cancerBar,
+        h("div", { class: "data-toprow" }, searchIn, hubWrap, h("div", { class: "data-actions" }, viewWrap, copyBibBtn, exportBtn)),
+        modStrip,
+        h("div", { class: "data-subrow" },
+          h("label", { class: "check" }, chkComm, "Commercial use allowed"),
+          h("label", { class: "check" }, chkOpen, "No access gate / DUA"))),
+      resultsHolder,
+      liveBox);
+  }
+
   // ── boot ─────────────────────────────────────────────────────────────
   (async function boot() {
     try { S.reg = await (await fetch("models.json", { cache: "no-cache" })).json(); }
     catch (e) { $("#rack").replaceChildren(h("div", { class: "notice err", text: "Could not load models.json. Serve this folder over HTTP (GitHub Pages, or python -m http.server) rather than opening the file directly." })); return; }
     S.reg.models.forEach(m => (S.byId[m.id] = m));
+    (S.reg.open_datasets || []).forEach(d => (S.dataById[d.id] = d));
     renderCounts(); renderFamilies(); renderSpecies(); fillModelSelect();
     renderHwBar();
     HW.detectBrowser().then(b => { S.bhw = b; renderHwBar(); renderRack(); if (S.run.model && !$("#view-run").hidden) renderAside(S.run.model, S.run.task); if (!$("#view-connect").hidden) renderLaunch(); });

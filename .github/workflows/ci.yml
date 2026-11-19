@@ -33,7 +33,23 @@ jobs:
               assert m.get('species') in ('human', 'multi-species', 'rodent'), m['id']
               for t in m.get('tasks', []):
                   assert t in reg['tasks'], (m['id'], t)
-          print(f'Verified {len(ids)} models in registry.')
+          assert 'dataset_cancer_sites' in reg and 'dataset_modalities' in reg and 'open_datasets' in reg and 'dataset_hubs' in reg
+          d_ids = [d['id'] for d in reg['open_datasets']]
+          assert len(d_ids) == len(set(d_ids)), 'Duplicate dataset IDs in docs/models.json'
+          model_set = set(ids)
+          for d in reg['open_datasets']:
+              assert d['cancer_scope'] in ('pan_cancer', 'organ_specific'), d['id']
+              assert d['cancer_site'] in reg['dataset_cancer_sites'], d['id']
+              assert d['modality_group'] in reg['dataset_modalities'], d['id']
+              assert d['regime'] in ('matched', 'unmatched'), d['id']
+              assert d['source_hub'] in reg['dataset_hubs'], d['id']
+              assert d.get('data_url') and d.get('paper_url') and d.get('citation') and d.get('tumor_types'), d['id']
+              assert d.get('species') in ('human', 'multi-species', 'rodent'), d['id']
+              for mid in d.get('compatible_models', []):
+                  assert mid in model_set, (d['id'], mid)
+          for prio in ('brain', 'lung', 'breast', 'prostate', 'pan_cancer'):
+              assert any(d['cancer_site'] == prio for d in reg['open_datasets']), prio
+          print(f'Verified {len(ids)} models and {len(d_ids)} oncology open datasets in registry.')
           "
       - name: Run all model x task mock API tests
         env:

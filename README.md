@@ -1,6 +1,6 @@
 # Histology FM Portal
 
-A graphical front end for **55 open-weight clinical and preclinical histology foundation models** — with verified paper links, one-click BibTeX citations, species/scope filtering (human clinical, multi-species & veterinary, and rodent toxicologic pathology), and interactive result viewers. It is a static site that can be hosted on GitHub Pages (`docs/`), plus a small FastAPI inference server (`backend/`) that you run on a GPU machine.
+A graphical front end for **55 open-weight clinical and preclinical histology foundation models** — with verified paper links, one-click BibTeX citations, an **Open Data** catalogue & live repository scanner (Zenodo, *Nature Scientific Data*, Hugging Face Datasets, TCIA/IDC, CELLxGENE), species/scope filtering (human clinical, multi-species & veterinary, and rodent toxicologic pathology), and interactive result viewers. It is a static site that can be hosted on GitHub Pages (`docs/`), plus a small FastAPI inference server (`backend/`) that you run on a GPU machine.
 
 Choose a model, give it tiles or a whole slide, and the portal returns outputs that match the model type:
 
@@ -16,8 +16,8 @@ Choose a model, give it tiles or a whole slide, and the portal returns outputs t
 ```
 GitHub Pages (docs/)  ──HTTPS/localhost──▶  backend/server.py (your GPU)
   55-model catalogue,                          TRIDENT: WSI reading, segmentation,
-  species filter, Papers                       patching, patch + slide encoders
-  & BibTeX tab, viewers                        + runners: CONCH/MUSK/KEEP/PLIP/QuiltNet/Loki
+  Papers & Open Data                           patching, patch + slide encoders
+  tabs, BibTeX, viewers                        + runners: CONCH/MUSK/KEEP/PLIP/QuiltNet/Loki
   (no images leave                             zero-shot, TissueDecision-9B tox VLM, TITAN,
    your network)                               GigaTIME, HEX, STPath, DeepSpot-M, TiSAM
 ```
@@ -170,6 +170,27 @@ Where a source is silent, the registry says so in `notes`. For example, PLIP and
 | Tissue segmentation | GrandQC tissue segmenter | `seg:grandqc` | — | CC-BY-NC-SA-4.0 | no | Segment tissue |
 | Tissue segmentation | TiSAM (MegaMouse) | `tisam_megamouse` | 52 mouse classes | Apache-2.0 / Academic | no | Segment tissue |
 | Tissue segmentation | Otsu threshold | `seg:otsu` | — | No weights | no | Segment tissue |
+
+## Open-access oncology datasets (`Open Data` tab)
+The **Open Data** tab (`#data`) indexes **39 verified cancer-only open-access datasets** across **Zenodo**, ***Nature Scientific Data***, **Hugging Face Datasets**, **NCI IDC / TCIA / HTAN**, **Harvard Dataverse**, and **Weizmann 3CA / CZ CELLxGENE**, split into **Pan-Cancer** and **Organ-Specific** cohorts with complete 6-modality coverage across priority **Brain, Lung, Breast, and Prostate** cancers:
+
+| Cancer cohort | Scope | Matched (H&E+Spatial, H&E+IF/IHC, Multi-Omics/VQA) | Unmatched (H&E, Spatial Omics/IMC, scRNA-seq) |
+|---|---|---|---|
+| **★ Brain** | Organ-specific | Ravi GBM Visium+H&E, Coy GBM t-CyCIF+H&E (`HTAN`), Greenwald Glioma Visium+CODEX+H&E (`Zenodo`), Ivy GAP GBM | EBRAINS Digital Brain Tumour Atlas (`Scientific Data`), Karimi Brain IMC (`Zenodo`), GBmap (1.1M GBM cells) |
+| **★ Lung** | Organ-specific | NSCLC 10x Xenium & Visium HD + H&E, DeepLIIF NSCLC IHC/mpIF, CPTAC-LUAD/LSCC & NLST | ANORAK LUAD Growth Patterns & `SPIDER-thorax` (`HF` + `Zenodo`), Sorin Lung IMC (`Zenodo`) & Lung t-CyCIF (`Scientific Data`), Salcher LuCA (1.28M NSCLC cells) |
+| **★ Breast** | Organ-specific | Janesick Same-Block Xenium+Visium+IF+H&E (`CAMEO-Breast`), HER2ST (`Zenodo`), ACROBAT (`Scientific Data`), BCI & MIST | BRACS, CAMELYON16/17 & PCam (`Zenodo` + `HF`), Basel/Zurich & METABRIC Breast IMC (`Zenodo`), Wu Breast scRNA-seq Atlas |
+| **★ Prostate** | Organ-specific | Erickson Clonal Prostate Visium+H&E (`HEST-1k`), PESO & PRECISE Restained H&E+P63/CK8/18 IHC (`Zenodo`), TCGA-PRAD Multi-Omics (`IDC`) | PANDA, PANDA-PLUS & AGGC Gleason WSIs, Prostate 10x Xenium & SODB Slices, Hirz & Chen Prostate scRNA-seq (`3CA`) |
+| **Pan-Cancer** | Multi-organ | HEST-1k Cancer (`HF`), STHELAR (`Scientific Data` + `HF`), STimage-1K4M & ST-Bank, HTAN mIF+H&E & GigaTIME Eval, Same-Tissue Xenium+COMET+H&E (`Zenodo`), TCGA & CPTAC (33 cancers), Quilt-1M / VQA | HISTAI (>112k WSIs), SPIDER & MIDOG++, SpatialCorpus-110M TME (`HF`), Tahoe-100M & Weizmann 3CA |
+| **Other Solid** | Reference mIF/CODEX | Orion-CRC & MIPHEI same-section H&E + 18-plex CyCIF, TCIA HNSCC-mIF-mIHC | Schürch / Nolan 56-marker CODEX CRC (`HEX nolan48` reference) |
+
+Each dataset links directly to its repository deposit, peer-reviewed data descriptor, copyable download/Python snippet, BibTeX entry, and compatible runnable models in this portal. You can also scan Zenodo, *Scientific Data*, and Hugging Face live for oncology datasets from the browser or via the CLI utility:
+
+```bash
+python backend/scan_open_data.py --cancer brain
+python backend/scan_open_data.py --cancer prostate
+python backend/scan_open_data.py --all-priority --out oncology_data_candidates.json
+```
+
 ## Adding a model
 1. Add an entry to `docs/models.json` with `id`, `category`, `runner`, `tasks` and licence fields. The portal picks it up automatically.
 2. If TRIDENT already supports it, set `runner: "trident_patch"` (or `"trident_slide"`) and `trident_name`. Nothing else is needed.

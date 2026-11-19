@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Histology FM Portal</title>
-<meta name="description" content="Run 55 open-weight clinical and preclinical histology foundation models — patch and slide encoders, vision–language zero-shot, rodent toxicologic VLM QA, virtual multiplex (GigaTIME, HEX), spatial expression (STPath, DeepSpot-M), and segmentation (HEST, GrandQC, TiSAM) — with verified paper links.">
+<meta name="description" content="Run 55 open-weight clinical and preclinical histology foundation models — patch and slide encoders, vision–language zero-shot, rodent toxicologic VLM QA, virtual multiplex (GigaTIME, HEX), spatial expression (STPath, DeepSpot-M), and segmentation (HEST, GrandQC, TiSAM) — with verified paper links and open-access multimodal datasets.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 16'%3E%3Crect width='32' height='16' rx='2' fill='%23c2407a'/%3E%3Crect width='11' height='16' fill='%23ffffffcc'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,6 +22,7 @@
       <button data-view="run">Run</button>
       <button data-view="results">Results</button>
       <button data-view="papers">Papers</button>
+      <button data-view="data">Open Data</button>
       <button data-view="connect">Connect</button>
     </nav>
     <div class="conn">
@@ -145,6 +146,18 @@
       </div>
     </div>
     <div id="papersView"></div>
+  </section>
+
+  <!-- ═════════════ OPEN DATA ═════════════ -->
+  <section id="view-data" aria-labelledby="h-data" hidden>
+    <div class="intro">
+      <div>
+        <h2 id="h-data" style="margin-bottom:6px">Open-access oncology data — organ-specific &amp; pan-cancer</h2>
+        <p class="muted">Cancer-only open deposits across Zenodo, <em>Nature Scientific Data</em>, Hugging Face Datasets, NCI IDC/TCIA and Weizmann 3CA / CELLxGENE — split into <strong>Pan-Cancer</strong> and <strong>Organ-Specific</strong> cohorts with priority coverage of <strong>Brain, Lung, Breast and Prostate</strong> cancers across matched and unmatched modalities.</p>
+      </div>
+      <div class="counts" id="dataCounts"></div>
+    </div>
+    <div id="dataView"></div>
   </section>
 
   <!-- ═════════════ CONNECT ═════════════ -->

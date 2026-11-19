@@ -88,6 +88,25 @@ def test_health_and_models():
 def test_all_models_all_tasks():
     reg = json.loads(server.REGISTRY_PATH.read_text(encoding="utf-8"))
     assert "benchmarks" in reg and "literature_references" in reg
+    assert "dataset_cancer_sites" in reg and "dataset_modalities" in reg and len(reg["open_datasets"]) >= 30
+    model_ids = {m["id"] for m in reg["models"]}
+    for d in reg["open_datasets"]:
+        assert d["cancer_scope"] in ("pan_cancer", "organ_specific"), d["id"]
+        assert d["cancer_site"] in reg["dataset_cancer_sites"], d["id"]
+        assert d["modality_group"] in reg["dataset_modalities"], d["id"]
+        assert d["regime"] in ("matched", "unmatched"), d["id"]
+        assert d.get("data_url") and d.get("paper_url") and d.get("citation") and d.get("tumor_types"), d["id"]
+        assert set(d.get("compatible_models", [])).issubset(model_ids), d["id"]
+    import scan_open_data
+    assert scan_open_data.classify_modality("Visium spatial transcriptomics H&E slide") == "matched_he_spatial"
+    assert scan_open_data.classify_modality("Orion CyCIF multiplex immunofluorescence H&E") == "matched_he_if"
+    assert scan_open_data.classify_modality("Single-cell RNA-seq perturbation atlas") == "unmatched_tx"
+    assert scan_open_data.classify_cancer_site("Human glioblastoma IDH-wildtype Visium") == "brain"
+    assert scan_open_data.classify_cancer_site("NSCLC lung adenocarcinoma IMC") == "lung"
+    assert scan_open_data.classify_cancer_site("HER2-positive breast carcinoma Xenium") == "breast"
+    assert scan_open_data.classify_cancer_site("Gleason grading prostate adenocarcinoma") == "prostate"
+    assert scan_open_data.classify_cancer_site("Pan-cancer glioblastoma and breast carcinoma") == "pan_cancer"
+    assert scan_open_data.is_cancer_related("Invasive breast carcinoma") and not scan_open_data.is_cancer_related("Healthy donor liver")
     wsi = fake_he(1400, 1000, 99)
     n = 0
     for m in reg["models"]:
