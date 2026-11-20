@@ -422,6 +422,11 @@
 
   window.addEventListener("portal-ready", e => {
     P = window.Portal;
+    const d = dlg();
+    if (d) {
+      d.addEventListener("close", stopPoll);
+      d.addEventListener("click", ev => { if (ev.target === d) close(); });
+    }
     const from = e.detail && e.detail.wizardFrom;
     if (from === "installer") { open(true); return; }
     // First visit with no server: offer setup once, gently.

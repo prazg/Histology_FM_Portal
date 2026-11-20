@@ -19,10 +19,12 @@
     del(k) { try { localStorage.removeItem(k); sessionStorage.removeItem(k); } catch { /* */ } },
   };
 
+  const MAX_CMP = 4;
   const S = {
     reg: null, byId: {}, dataById: {}, conn: { mode: store.get("fm.mode", "auto"), url: store.get("fm.url", "http://127.0.0.1:8000"), key: store.get("fm.key", ""), hf: "" },
     health: null, ready: {}, connected: false, jobs: [], demoJobs: [], selJob: null, poll: null,
     bhw: null, weights: {}, perf: {}, wPoll: null, drawerModel: null, serverFound: null,
+    cmp: [], cmpMsg: "", cmpMsgTimer: null, tileUrls: [],
     filt: { fam: null, species: null, q: "", commercial: false, ungated: false, ready: false, hw: false },
     papers: { q: "", species: null },
     data: {
@@ -34,6 +36,27 @@
     run: { model: null, task: null, src: "path", tiles: [] },
   };
   try { S.conn.hf = sessionStorage.getItem("fm.hf") || ""; } catch { /* */ }
+  try {
+    const savedCmp = JSON.parse(sessionStorage.getItem("fm.cmp") || "[]");
+    if (Array.isArray(savedCmp)) S.cmp = savedCmp.filter(x => typeof x === "string").slice(0, MAX_CMP);
+  } catch { /* */ }
+
+  const safeUrl = u => /^https?:\/\//i.test(String(u || "").trim()) ? String(u).trim() : "#";
+  function downloadBlob(content, filename, mime = "text/plain;charset=utf-8") {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = h("a", { href: url, download: filename });
+    document.body.append(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 500);
+  }
+  function csvEscape(v) {
+    const s = v == null ? "" : String(v);
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  }
+  function toCsv(headers, rows) {
+    return "\uFEFF" + [headers.map(csvEscape).join(","), ...rows.map(r => r.map(csvEscape).join(","))].join("\r\n") + "\r\n";
+  }
 
   // ── API ──────────────────────────────────────────────────────────────
   const base = () => S.conn.url.replace(/\/+$/, "");
@@ -63,35 +86,135 @@
     return api(`/api/jobs/${jobId}/spatial/${pid}/${idx}`);
   };
 
-  // ── copy & citation helpers ──────────────────────────────────────────
-  function copyText(txt, btn) {
-    const done = () => { if (!btn) return; const old = btn.textContent; btn.textContent = "Copied"; setTimeout(() => (btn.textContent = old), 1400); };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done).catch(() => {});
-    else { const ta = h("textarea", { style: "position:fixed;opacity:0" }); ta.value = txt; document.body.append(ta); ta.select(); try { document.execCommand("copy"); done(); } catch { /* */ } ta.remove(); }
+  let shownKey = "";
+
+  // ── copy, BibTeX & export helpers ────────────────────────────────────
+  function openBibModal(title, bibText, filename = "citation.bib") {
+    const d = $("#bibModal");
+    if (!d) return;
+    const cBtn = h("button", { type: "button", class: "btn small", onclick: () => copyText(bibText, cBtn) }, "Copy BibTeX");
+    const dlBtn = h("button", { type: "button", class: "btn ghost small", onclick: () => downloadBlob(bibText + "\n", filename, "application/x-bibtex;charset=utf-8") }, "Download .bib");
+    d.replaceChildren(
+      h("div", { class: "modal-frame" },
+        h("div", { class: "modal-head" },
+          h("h2", { id: "bibModalTitle", text: title }),
+          h("div", { class: "modal-head-actions" }, cBtn, dlBtn,
+            h("button", { type: "button", class: "icon-btn", "aria-label": "Close BibTeX dialog", onclick: () => d.close() }, "✕"))),
+        h("div", { class: "modal-body bib-body" },
+          h("pre", { class: "cli", style: "margin:0;white-space:pre-wrap;word-break:break-word", text: bibText }))));
+    if (!d.open) d.showModal();
   }
+
+  function copyText(txt, btn, fallbackTitle) {
+    const done = () => {
+      if (!btn) return;
+      const old = btn.textContent;
+      btn.textContent = "Copied";
+      setTimeout(() => { btn.textContent = old; }, 1400);
+    };
+    const fallback = () => {
+      const ta = h("textarea", { style: "position:fixed;left:-9999px;opacity:0" });
+      ta.value = txt;
+      document.body.append(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch { ok = false; }
+      ta.remove();
+      if (ok) done();
+      else openBibModal(fallbackTitle || "BibTeX / Snippet", txt);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(done).catch(fallback);
+    } else {
+      fallback();
+    }
+  }
+
   function cliBlock(code) {
-    const btn = h("button", { type: "button", class: "cli-copy", onclick: () => copyText(code, btn) }, "Copy");
+    const btn = h("button", { type: "button", class: "cli-copy", onclick: () => copyText(code, btn, "CLI snippet") }, "Copy");
     return h("div", { class: "cli-wrap" }, h("pre", { class: "cli", text: code }), btn);
   }
+
+  const escBib = s => String(s || "").replace(/\\?&/g, "\\&").replace(/\\?%/g, "\\%");
+  function parseCiteParts(cite, fallbackAuthor, fallbackTitle) {
+    const raw = String(cite || "").trim();
+    if (!raw) return { author: fallbackAuthor, title: fallbackTitle };
+    let author = fallbackAuthor, rest = raw;
+    const etAlIdx = raw.search(/\bet al\.,/i);
+    if (etAlIdx >= 0) {
+      const cut = raw.indexOf(",", etAlIdx);
+      author = raw.slice(0, cut).trim();
+      rest = raw.slice(cut + 1).trim();
+    } else {
+      const firstComma = raw.indexOf(",");
+      if (firstComma > 0) {
+        const cand = raw.slice(0, firstComma).trim();
+        const looksLikeAuthor = cand.length <= 44 && !/^(an? |the |open |human |10x |hnscc)/i.test(cand) && !/:/.test(cand);
+        if (looksLikeAuthor) {
+          author = cand;
+          rest = raw.slice(firstComma + 1).trim();
+        } else {
+          rest = raw;
+        }
+      }
+    }
+    let title = rest.replace(/\s*\(\d{4}(?:[–-]\d{4})?\)\s*$/, "").trim();
+    // Strip trailing ", Journal / Venue" segment when present after paper title
+    const lastComma = title.lastIndexOf(",");
+    if (lastComma > 18) {
+      const tail = title.slice(lastComma + 1).trim();
+      if (tail.length <= 42 && /^(nature|science|cell|medrxiv|biorxiv|arxiv|cvpr|eccv|icml|neurips|ieee|med\.|media|npj|neuro-oncology|database|jama|nucleic|zenodo|nci|bioptimus)/i.test(tail)) {
+        title = title.slice(0, lastComma).trim();
+      }
+    }
+    return { author: author || fallbackAuthor, title: title || fallbackTitle };
+  }
+
+  function doiFromUrl(u) {
+    const m = String(u || "").match(/^https?:\/\/doi\.org\/(10\.\d{4,9}\/\S+)$/i);
+    return m ? m[1] : "";
+  }
+
   function bibtexFor(m) {
     const key = m.id.replace(/[^a-zA-Z0-9_]/g, "_");
     const yr = ((m.citation || m.paper_label || "").match(/\b(19|20)\d{2}\b/) || ["2025"])[0];
-    const cite = m.citation || `${m.developer}, ${m.name}`;
-    const [authPart, ...rest] = cite.split(",");
-    const titlePart = rest.length ? rest.join(",").replace(/\(\d{4}\)\s*$/, "").trim() : m.name;
-    return `@article{${key}_${yr},\n  author  = {${(authPart || m.developer).trim()}},\n  title   = {${titlePart}},\n  journal = {${m.paper_label || "Preprint"}},\n  year    = {${yr}},\n  url     = {${m.paper_url || m.link || ""}}\n}`;
+    const { author, title } = parseCiteParts(m.citation, m.developer, m.name);
+    const url = m.paper_url || m.link || "";
+    const doi = doiFromUrl(url);
+    const lines = [
+      `@article{${key}_${yr},`,
+      `  author  = {${escBib(author)}},`,
+      `  title   = {${escBib(title)}},`,
+      `  journal = {${escBib(m.paper_label || "Preprint")}},`,
+      `  year    = {${yr}},`,
+    ];
+    if (doi) lines.push(`  doi     = {${doi}},`);
+    lines.push(`  url     = {${url}}`, `}`);
+    return lines.join("\n");
   }
+
   function bibtexForDataset(d) {
     const key = "data_" + d.id.replace(/[^a-zA-Z0-9_]/g, "_");
     const yr = ((d.citation || d.paper_label || "").match(/\b(19|20)\d{2}\b/) || ["2025"])[0];
-    const cite = d.citation || `${d.developer}, ${d.name}`;
-    const [authPart, ...rest] = cite.split(",");
-    const titlePart = rest.length ? rest.join(",").replace(/\(\d{4}\)\s*$/, "").trim() : d.name;
-    return `@misc{${key}_${yr},\n  author       = {${(authPart || d.developer).trim()}},\n  title        = {${titlePart}},\n  howpublished = {${d.source_label}: ${d.data_url}},\n  note         = {${d.paper_label || "Open dataset"}},\n  year         = {${yr}},\n  url          = {${d.paper_url || d.data_url}}\n}`;
+    const { author, title } = parseCiteParts(d.citation, d.developer, d.name);
+    const url = d.paper_url || d.data_url || "";
+    const doi = doiFromUrl(url) || doiFromUrl(d.data_url);
+    const lines = [
+      `@misc{${key}_${yr},`,
+      `  author       = {${escBib(author)}},`,
+      `  title        = {${escBib(title)}},`,
+      `  howpublished = {${escBib(d.source_label)}: ${d.data_url}},`,
+      `  note         = {${escBib(d.paper_label || "Open dataset")}},`,
+      `  year         = {${yr}},`,
+    ];
+    if (doi) lines.push(`  doi          = {${doi}},`);
+    lines.push(`  url          = {${url}}`, `}`);
+    return lines.join("\n");
   }
 
   // ── routing ──────────────────────────────────────────────────────────
-  function route() {
+  function route(preserveScroll) {
+    const sy = window.scrollY;
     const [view, arg] = (location.hash.slice(1) || "models").split("/");
     const v = ["models", "run", "results", "papers", "data", "connect"].includes(view) ? view : "models";
     document.querySelectorAll("main > section").forEach(s => (s.hidden = s.id !== "view-" + v));
@@ -101,23 +224,67 @@
     if (v === "papers") renderPapers();
     if (v === "data") { renderData(); if (arg && S.dataById[decodeURIComponent(arg)]) openDatasetDrawer(S.dataById[decodeURIComponent(arg)]); }
     if (v === "connect") renderConnect();
-    window.scrollTo({ top: 0 });
+    window.scrollTo({ top: preserveScroll === true ? sy : 0 });
   }
   const go = (hash) => { if (location.hash === "#" + hash) route(); else location.hash = hash; };
   document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", () => go(b.dataset.view)));
 
-  // ── theme ────────────────────────────────────────────────────────────
+  // ── theme & keyboard shortcuts ───────────────────────────────────────
+  const isDarkTheme = () => document.documentElement.dataset.theme
+    ? document.documentElement.dataset.theme === "dark"
+    : matchMedia("(prefers-color-scheme: dark)").matches;
+  function syncThemeBtn() {
+    const btn = $("#themeBtn");
+    if (!btn) return;
+    const dark = isDarkTheme();
+    btn.title = dark ? "Darkfield (dark) — switch to Brightfield (light)" : "Brightfield (light) — switch to Darkfield (dark)";
+    btn.setAttribute("aria-label", btn.title);
+  }
   const savedTheme = store.get("fm.theme", "");
   if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+  syncThemeBtn();
   $("#themeBtn").addEventListener("click", () => {
-    const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.dataset.theme = dark ? "light" : "dark";
+    document.documentElement.dataset.theme = isDarkTheme() ? "light" : "dark";
     store.set("fm.theme", document.documentElement.dataset.theme);
-    route();
-    if (!$("#view-models").hidden) renderRack();
+    syncThemeBtn();
+    shownKey = "";
+    if (S.reg) {
+      route(true);
+      if (!$("#view-models").hidden) renderRack();
+    }
   });
 
-  // ── catalogue ────────────────────────────────────────────────────────
+  document.addEventListener("keydown", e => {
+    const openDlgs = ["bibModal", "cmpModal", "drawer", "wizard"].map(id => document.getElementById(id)).filter(d => d && d.open);
+    if (e.key === "Escape") {
+      if (openDlgs.length) {
+        e.preventDefault();
+        openDlgs[0].close();
+        return;
+      }
+      const ae = document.activeElement;
+      if (ae && ae.tagName === "INPUT" && ae.type === "search") ae.blur();
+      return;
+    }
+    if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey && !openDlgs.length) {
+      const ae = document.activeElement;
+      if (ae && (["INPUT", "TEXTAREA", "SELECT"].includes(ae.tagName) || ae.isContentEditable)) return;
+      e.preventDefault();
+      if (!$("#view-papers").hidden) {
+        const ps = $("#papersView .search");
+        if (ps) { ps.focus(); ps.select(); return; }
+      }
+      if (!$("#view-data").hidden) {
+        const ds = $("#dataView .data-toprow .search");
+        if (ds) { ds.focus(); ds.select(); return; }
+      }
+      if ($("#view-models").hidden) go("models");
+      const qEl = $("#q");
+      if (qEl) { qEl.focus(); qEl.select(); }
+    }
+  });
+
+  // ── catalogue, exports & side-by-side comparison ─────────────────────
   const famLabel = c => S.reg.categories[c].label;
   const commercial = m => !!m.commercial_use;
   const isReady = m => S.conn.mode === "demo" ? !!m.runner : !!(S.ready[m.id] && S.ready[m.id].ready);
@@ -132,8 +299,15 @@
     if (m.category === "vmif") return `${(m.channels || []).length} markers`;
     if (m.category === "st") return "Gene expression per spot";
     if (m.category === "seg") return "Tissue contours";
-    if (m.category === "slide") return `1 vector / slide (from ${m.patch_encoder})`;
+    if (m.category === "slide") return `${m.slide_dim ? m.slide_dim + "-d " : ""}slide vector (from ${m.patch_encoder})`;
     return m.embed_dim ? `${m.embed_dim}-d embedding` : "Embedding";
+  }
+  function embedDimLabel(m) {
+    if (m.embed_dim) return `${m.embed_dim}-d`;
+    if (m.slide_dim) return `${m.slide_dim}-d (slide)`;
+    if (m.category === "vmif") return `${(m.channels || []).length} markers`;
+    if (m.runner === "tisam") return "52 classes";
+    return outputSummary(m);
   }
   function inputSummary(m) {
     if (m.id === "hex_nolan48") return "56 µm patches → 384 px";
@@ -150,28 +324,226 @@
     return h("span", { class: "badge " + sp.cls, title: m.species_note || sp.label }, sp.badge);
   }
 
-  function slideCard(m) {
-    const ready = S.connected || S.conn.mode === "demo" ? isReady(m) : null;
-    const tasks = (m.tasks || []).map(t => S.reg.tasks[t].label).join(" · ") || "Catalogue entry — no runner yet";
-    const el = h("button", { class: `slide fam-${m.category}`, type: "button", "data-ready": ready === false ? "no" : "yes", "aria-label": `${m.name} — details` },
-      h("span", { class: "label" },
-        h("span", { class: "nm", text: m.name }), h("span", { class: "dev", text: m.developer }),
-        h("span", { class: "badges" }, speciesBadge(m), licenceBadge(m), m.gated ? h("span", { class: "badge", title: "Request access on Hugging Face" }, "Access request") : null,
-          ready && S.conn.mode === "server" ? h("span", { class: "badge ready" }, "Ready") : null)),
-      h("span", { class: "specimen" },
-        h("dl", {}, h("dt", { text: "Output" }), h("dd", { text: outputSummary(m) }), h("dt", { text: "Input" }), h("dd", { text: inputSummary(m) }),
-          h("dt", { text: "Hardware" }), h("dd", {}, hwBadge(m))),
-        h("span", { class: "tasks", text: m.paper_label ? `${tasks} · ${m.paper_label}` : tasks })));
-    el.addEventListener("click", () => openDrawer(m));
-    return el;
+  const isPinned = id => S.cmp.includes(id);
+  function saveCmp() {
+    try { sessionStorage.setItem("fm.cmp", JSON.stringify(S.cmp)); } catch { /* */ }
+  }
+  function toggleCompare(id) {
+    if (!S.byId[id]) return;
+    clearTimeout(S.cmpMsgTimer);
+    S.cmpMsg = "";
+    const idx = S.cmp.indexOf(id);
+    if (idx >= 0) {
+      S.cmp.splice(idx, 1);
+    } else if (S.cmp.length >= MAX_CMP) {
+      S.cmpMsg = `Maximum ${MAX_CMP} models can be compared at once — unpin one below first.`;
+      S.cmpMsgTimer = setTimeout(() => { S.cmpMsg = ""; renderCompareDock(); }, 3600);
+      renderCompareDock();
+      return;
+    } else {
+      S.cmp.push(id);
+    }
+    saveCmp();
+    renderCompareDock();
+    if (S.reg && !$("#view-models").hidden) renderRack();
+    if (S.reg && !$("#view-papers").hidden) renderPapers();
+    if (S.drawerModel && $("#drawer").open) openDrawer(S.drawerModel, true);
+    const cm = $("#cmpModal");
+    if (cm && cm.open) {
+      if (S.cmp.length) openCompareModal(true);
+      else cm.close();
+    }
+  }
+  function clearCompare() {
+    S.cmp = [];
+    S.cmpMsg = "";
+    saveCmp();
+    const cm = $("#cmpModal");
+    if (cm && cm.open) cm.close();
+    renderCompareDock();
+    if (S.reg && !$("#view-models").hidden) renderRack();
+    if (S.reg && !$("#view-papers").hidden) renderPapers();
+    if (S.drawerModel && $("#drawer").open) openDrawer(S.drawerModel, true);
   }
 
+  function renderCompareDock() {
+    const dock = $("#cmpDock");
+    if (!dock || !S.reg) return;
+    const models = S.cmp.map(id => S.byId[id]).filter(Boolean);
+    document.body.classList.toggle("has-cmp-dock", models.length > 0);
+    if (!models.length) { dock.hidden = true; dock.replaceChildren(); return; }
+    dock.hidden = false;
+    const emptySlots = Array.from({ length: Math.max(0, MAX_CMP - models.length) }, (_, i) =>
+      h("span", { class: "cmp-slot-empty", text: `+ Slot ${models.length + i + 1}` }));
+    dock.replaceChildren(
+      h("span", { class: "cmp-dock-title", text: `Compare (${models.length}/${MAX_CMP})` }),
+      h("div", { class: "cmp-chips" },
+        ...models.map(m => h("span", { class: "cmp-chip" },
+          h("span", { class: "sw", style: `background:var(--c-${m.category})` }),
+          h("span", { class: "nm", text: m.name, title: `${m.name} (${famLabel(m.category)})` }),
+          h("button", { type: "button", "aria-label": `Remove ${m.name} from comparison`, title: "Unpin", onclick: () => toggleCompare(m.id) }, "✕"))),
+        ...emptySlots),
+      h("div", { class: "cmp-dock-actions" },
+        h("button", { type: "button", class: "btn small", onclick: () => openCompareModal() }, `Compare side-by-side (${models.length})`),
+        h("button", { type: "button", class: "btn ghost small", onclick: clearCompare }, "Clear")),
+      S.cmpMsg ? h("p", { class: "cmp-dock-msg", role: "status", text: S.cmpMsg }) : null);
+  }
+
+  function exportModelsBib(list, prefix = "histology_fm") {
+    if (!list.length) return;
+    const tag = list.length === S.reg.models.length ? "all_55" : `${list.length}_models`;
+    downloadBlob(list.map(bibtexFor).join("\n\n") + "\n", `${prefix}_${tag}.bib`, "application/x-bibtex;charset=utf-8");
+  }
+  function exportModelsCsv(list, prefix = "histology_fm") {
+    if (!list.length) return;
+    const tag = list.length === S.reg.models.length ? "all_55" : `${list.length}_models`;
+    const headers = [
+      "id", "name", "developer", "family", "architecture", "params", "embed_dim",
+      "input_size", "output_summary", "species", "licence", "commercial_use",
+      "hf_gated", "hf_repo", "weights_gb", "runtime_weights_gb", "runnable",
+      "tasks", "paper_label", "paper_url", "citation", "repo_url"
+    ];
+    const rows = list.map(m => [
+      m.id, m.name, m.developer, famLabel(m.category), m.arch || "", m.params || "",
+      embedDimLabel(m), inputSummary(m), outputSummary(m),
+      (SPECIES_META[m.species] || SPECIES_META.human).label, m.licence,
+      commercial(m) ? "yes" : "no", m.gated ? "yes" : "no", m.hf_repo || "",
+      m.weights_gb ?? "", m.runtime_weights_gb ?? "", m.runner ? "yes" : "no",
+      (m.tasks || []).map(t => S.reg.tasks[t].label).join("; "),
+      m.paper_label || "", m.paper_url || "", m.citation || "", m.link || ""
+    ]);
+    downloadBlob(toCsv(headers, rows), `${prefix}_${tag}.csv`, "text/csv;charset=utf-8");
+  }
+
+  function openCompareModal(keepOpen) {
+    const d = $("#cmpModal");
+    if (!d || !S.reg) return;
+    const models = S.cmp.map(id => S.byId[id]).filter(Boolean);
+    if (!models.length) { d.close(); return; }
+    const copyAllBtn = h("button", { type: "button", class: "btn ghost small", onclick: () => copyText(models.map(bibtexFor).join("\n\n"), copyAllBtn, "Pinned models BibTeX") }, `Copy BibTeX (${models.length})`);
+    const dlBibBtn = h("button", { type: "button", class: "btn ghost small", onclick: () => exportModelsBib(models, "histology_fm_comparison") }, "Download .bib");
+    const dlCsvBtn = h("button", { type: "button", class: "btn ghost small", onclick: () => exportModelsCsv(models, "histology_fm_comparison") }, "Export CSV");
+
+    const specRows = [
+      ["Family & scope", m => h("div", { style: "display:flex;gap:6px;flex-wrap:wrap;align-items:center" },
+        h("span", { class: "badge", style: `border-color:var(--c-${m.category})` }, famLabel(m.category)),
+        speciesBadge(m) || h("span", { class: "small muted", text: "Human clinical" }))],
+      ["Developer", m => m.developer],
+      ["Architecture", m => h("code", { text: m.arch || "—" })],
+      ["Parameters & weights", m => h("span", {}, h("strong", { text: m.params || "—" }),
+        m.runtime_weights_gb != null ? h("span", { class: "paper-cite", text: `${HW.gbFmt(m.runtime_weights_gb)} runtime weights` }) : null)],
+      ["Patch / input size", m => inputSummary(m)],
+      ["Embedding / output", m => h("span", {}, h("strong", { text: embedDimLabel(m) }),
+        embedDimLabel(m) !== outputSummary(m) ? h("span", { class: "paper-cite", text: outputSummary(m) }) : null)],
+      ["Hardware fit", m => { const f = fitFor(m); return h("div", {}, hwBadge(m), h("span", { class: "paper-cite", text: f.text })); }],
+      ["Tasks", m => (m.tasks || []).length
+        ? h("div", { class: "cmp-task-pills" }, m.tasks.map(t => h("span", { class: "assay-tag", text: S.reg.tasks[t].label })))
+        : h("span", { class: "small muted", text: "Catalogue only" })],
+      ["Commercial licence", m => h("div", {}, licenceBadge(m), h("span", { class: "paper-cite", text: commercial(m) ? `${m.licence} — commercial permitted` : `${m.licence} — academic / non-commercial` }))],
+      ["Hugging Face gating", m => h("div", {},
+        h("span", { class: "badge " + (m.gated ? "gated" : "free"), text: m.gated ? "Gated (access request)" : "Open download" }),
+        m.link ? h("span", { class: "paper-cite" }, h("a", { href: safeUrl(m.link), target: "_blank", rel: "noopener noreferrer", text: m.hf_repo || "Open repository ↗" })) : null)],
+      ["Paper & BibTeX", m => {
+        const bBtn = h("button", { type: "button", class: "btn ghost small", onclick: () => copyText(bibtexFor(m), bBtn, `${m.name} BibTeX`) }, "Copy BibTeX");
+        const vBtn = h("button", { type: "button", class: "btn ghost small", onclick: () => openBibModal(`${m.name} — BibTeX`, bibtexFor(m), `${m.id.replace(/[^a-zA-Z0-9_]/g, "_")}.bib`) }, "View .bib");
+        return h("div", { style: "display:grid;gap:6px" },
+          m.paper_url ? h("a", { href: safeUrl(m.paper_url), target: "_blank", rel: "noopener noreferrer", style: "font-weight:700", text: (m.paper_label || "Paper") + " ↗" }) : "—",
+          m.citation ? h("span", { class: "paper-cite", text: m.citation }) : null,
+          h("div", { style: "display:flex;gap:6px;flex-wrap:wrap" }, bBtn, vBtn));
+      }],
+      ["Actions", m => h("div", { style: "display:flex;gap:6px;flex-wrap:wrap" },
+        m.runner ? h("button", { type: "button", class: "btn small", onclick: () => { d.close(); go("run/" + encodeURIComponent(m.id)); } }, "Run model") : null,
+        h("button", { type: "button", class: "btn ghost small", onclick: () => { d.close(); openDrawer(m); } }, "Details"))],
+    ];
+
+    const colHeads = models.map(m => h("th", { scope: "col" },
+      h("div", { class: `cmp-col-head fam-${m.category}` },
+        h("div", { class: "cmp-col-top" },
+          h("span", { class: "cmp-col-nm", text: m.name }),
+          h("button", { type: "button", class: "btn ghost small", style: "padding:2px 7px", title: `Unpin ${m.name}`, "aria-label": `Remove ${m.name} from comparison`, onclick: () => toggleCompare(m.id) }, "✕")),
+        h("span", { class: "small muted", text: m.developer }))));
+
+    d.replaceChildren(
+      h("div", { class: "modal-frame" },
+        h("div", { class: "modal-head" },
+          h("div", {},
+            h("h2", { id: "cmpModalTitle", text: "Side-by-side encoder & model comparison" }),
+            h("p", { class: "small muted", style: "margin:2px 0 0", text: `Comparing ${models.length} of ${MAX_CMP} pinned foundation models across architecture, scale, licensing, and tasks.` })),
+          h("div", { class: "modal-head-actions" },
+            copyAllBtn, dlBibBtn, dlCsvBtn,
+            h("button", { type: "button", class: "btn ghost small", onclick: clearCompare }, "Clear all"),
+            h("button", { type: "button", class: "icon-btn", "aria-label": "Close comparison", onclick: () => d.close() }, "✕"))),
+        h("div", { class: "modal-body" },
+          h("table", { class: "cmp-table" },
+            h("thead", {}, h("tr", {}, h("th", { scope: "col", text: "Attribute" }), ...colHeads)),
+            h("tbody", {}, specRows.map(([lbl, fn]) => h("tr", {}, h("th", { scope: "row", text: lbl }), ...models.map(m => h("td", {}, fn(m))))))))));
+    if (!d.open && !keepOpen) d.showModal();
+  }
+
+  function slideCard(m) {
+    const ready = S.connected || S.conn.mode === "demo" ? isReady(m) : null;
+    const pinned = isPinned(m.id);
+    const tasks = (m.tasks || []).map(t => S.reg.tasks[t].label).join(" · ") || "Catalogue entry — no runner yet";
+    const archShort = m.arch ? m.arch.split(" (")[0] : "";
+    const paramShort = m.params && !m.params.startsWith("0") ? m.params.split(" (")[0] : "";
+    const metaTxt = [archShort, paramShort].filter(Boolean).join(" · ");
+
+    const bodyBtn = h("button", { class: "slide-body", type: "button", "aria-label": `${m.name} — view details`, onclick: () => openDrawer(m) },
+      h("span", { class: "label" },
+        h("span", { class: "nm", text: m.name }),
+        h("span", { class: "dev", text: m.developer }),
+        metaTxt ? h("span", { class: "arch-meta", text: metaTxt }) : null,
+        h("span", { class: "badges" },
+          speciesBadge(m),
+          licenceBadge(m),
+          m.gated ? h("span", { class: "badge gated", title: "Request access on Hugging Face" }, "Gated") : null,
+          ready && S.conn.mode === "server" ? h("span", { class: "badge ready" }, "Ready") : null)),
+      h("span", { class: "specimen" },
+        h("dl", {},
+          h("dt", { text: "Output" }), h("dd", { text: outputSummary(m) }),
+          h("dt", { text: "Input" }), h("dd", { text: inputSummary(m) }),
+          h("dt", { text: "Hardware" }), h("dd", {}, hwBadge(m))),
+        h("span", { class: "tasks", text: m.paper_label ? `${tasks} · ${m.paper_label}` : tasks })));
+
+    const cmpBtn = h("button", {
+      type: "button",
+      class: "cmp-toggle",
+      "aria-pressed": String(pinned),
+      "aria-label": `${pinned ? "Unpin" : "Compare"} ${m.name}`,
+      title: pinned ? "Pinned for comparison (click to remove)" : "Pin for side-by-side comparison (up to 4)",
+      onclick: e => { e.stopPropagation(); toggleCompare(m.id); }
+    }, pinned ? "✓ Pinned" : "+ Compare");
+
+    return h("article", {
+      class: `slide fam-${m.category}`,
+      "data-ready": ready === false ? "no" : "yes",
+      "data-compared": pinned ? "yes" : "no"
+    }, bodyBtn, cmpBtn);
+  }
+
+  const hasActiveModelFilters = () => {
+    const f = S.filt;
+    return !!(f.fam || f.species || f.q.trim() || f.commercial || f.ungated || f.ready || f.hw);
+  };
+
   function filtered() {
-    const f = S.filt, q = f.q.toLowerCase();
-    return S.reg.models.filter(m =>
-      (!f.fam || m.category === f.fam) && (!f.species || m.species === f.species) &&
-      (!f.commercial || commercial(m)) && (!f.ungated || !m.gated) && (!f.ready || isReady(m)) && (!f.hw || ["good", "ok"].includes(fitFor(m).level)) &&
-      (!q || [m.name, m.developer, m.licence, m.hf_repo, m.id, m.species, m.species_note, m.paper_label, m.citation].join(" ").toLowerCase().includes(q)));
+    const f = S.filt, tokens = f.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    return S.reg.models.filter(m => {
+      if (f.fam && m.category !== f.fam) return false;
+      if (f.species && m.species !== f.species) return false;
+      if (f.commercial && !commercial(m)) return false;
+      if (f.ungated && m.gated) return false;
+      if (f.ready && !isReady(m)) return false;
+      if (f.hw && !["good", "ok"].includes(fitFor(m).level)) return false;
+      if (!tokens.length) return true;
+      const taskTxt = (m.tasks || []).map(t => S.reg.tasks[t].label).join(" ");
+      const hay = [
+        m.name, m.developer, m.arch, m.params, m.embed_dim, m.slide_dim, m.licence,
+        m.hf_repo, m.id, m.trident_name, m.species, m.species_note, m.paper_label,
+        m.citation, m.notes, famLabel(m.category), taskTxt, (m.channels || []).join(" ")
+      ].join(" ").toLowerCase();
+      return tokens.every(tok => hay.includes(tok));
+    });
   }
 
   function renderFamilies() {
@@ -194,8 +566,24 @@
         h("span", { class: "sw", style: `background:${SPECIES_META[s].sw}` }), SPECIES_META[s].label, h("span", { class: "n", text: counts[s] })))));
   }
 
+  function renderCatToolbar(list) {
+    const bar = $("#catToolbar");
+    if (!bar || !S.reg) return;
+    const total = S.reg.models.length;
+    const active = hasActiveModelFilters();
+    bar.replaceChildren(
+      h("div", { class: "cat-toolbar-meta" },
+        h("strong", { text: active ? `Showing ${list.length} of ${total} models` : `All ${total} foundation models` }),
+        active ? h("button", { type: "button", class: "btn ghost small", onclick: resetFilters }, "Reset filters") : h("span", { class: "small muted", text: "Pin up to 4 cards to compare side-by-side" })),
+      h("div", { class: "cat-toolbar-actions" },
+        S.cmp.length ? h("button", { type: "button", class: "btn small", onclick: () => openCompareModal() }, `Compare (${S.cmp.length}/${MAX_CMP})`) : null,
+        h("button", { type: "button", class: "btn ghost small", disabled: !list.length, onclick: () => exportModelsBib(list) }, `Export BibTeX .bib (${list.length})`),
+        h("button", { type: "button", class: "btn ghost small", disabled: !list.length, onclick: () => exportModelsCsv(list) }, `Export CSV (${list.length})`)));
+  }
+
   function renderRack() {
     const list = filtered();
+    renderCatToolbar(list);
     const rack = $("#rack");
     if (!list.length) { rack.replaceChildren(h("div", { class: "empty" }, "No models match these filters. ", h("button", { class: "btn ghost small", onclick: resetFilters }, "Clear filters"))); return; }
     rack.replaceChildren(...FAM_ORDER.filter(c => list.some(m => m.category === c)).map(c =>
@@ -205,10 +593,17 @@
   }
   function resetFilters() {
     Object.assign(S.filt, { fam: null, species: null, q: "", commercial: false, ungated: false, ready: false, hw: false });
-    $("#q").value = ""; ["#fCommercial", "#fUngated", "#fReady", "#fHw"].forEach(s => ($(s).checked = false));
+    const qEl = $("#q");
+    qEl.value = "";
+    qEl.closest(".search-wrap")?.classList.remove("has-val");
+    ["#fCommercial", "#fUngated", "#fReady", "#fHw"].forEach(s => ($(s).checked = false));
     renderFamilies(); renderSpecies(); renderRack();
   }
-  $("#q").addEventListener("input", e => { S.filt.q = e.target.value; renderRack(); });
+  $("#q").addEventListener("input", e => {
+    S.filt.q = e.target.value;
+    e.target.closest(".search-wrap")?.classList.toggle("has-val", !!e.target.value);
+    renderRack();
+  });
   $("#fCommercial").addEventListener("change", e => { S.filt.commercial = e.target.checked; renderRack(); });
   $("#fUngated").addEventListener("change", e => { S.filt.ungated = e.target.checked; renderRack(); });
   $("#fReady").addEventListener("change", e => { S.filt.ready = e.target.checked; renderRack(); });
@@ -229,17 +624,21 @@
     const d = $("#drawer");
     S.drawerModel = m;
     const st = S.ready[m.id];
+    const pinned = isPinned(m.id);
     const spLabel = (SPECIES_META[m.species] || SPECIES_META.human).label;
-    const bibBtn = h("button", { type: "button", class: "btn ghost small", style: "margin-left:8px", onclick: () => copyText(bibtexFor(m), bibBtn) }, "Copy BibTeX");
+    const bibBtn = h("button", { type: "button", class: "btn ghost small", style: "margin-left:8px", onclick: () => copyText(bibtexFor(m), bibBtn, `${m.name} BibTeX`) }, "Copy BibTeX");
+    const viewBibBtn = h("button", { type: "button", class: "btn ghost small", style: "margin-left:6px", onclick: () => openBibModal(`${m.name} — BibTeX`, bibtexFor(m), `${m.id.replace(/[^a-zA-Z0-9_]/g, "_")}.bib`) }, "View .bib");
     const cli = m.tasks && m.tasks.length ? cliFor(m, m.tasks[0]) : null;
     const rows = [
       ["Family", famLabel(m.category)], ["Developer", m.developer],
+      m.arch ? ["Architecture", h("code", { text: m.arch })] : null,
+      m.params ? ["Parameters", m.params] : null,
       ["Species & scope", m.species_note ? `${spLabel} — ${m.species_note}` : spLabel],
       ["Output", outputSummary(m)], ["Input", inputSummary(m)],
       ["Licence", m.licence], ["Access", m.gated ? "Gated — request access on Hugging Face, then log in on the server" : "Open download"],
-      m.paper_url ? ["Paper / preprint", h("span", {}, h("a", { href: m.paper_url, target: "_blank", rel: "noopener", text: m.paper_label || m.paper_url }), bibBtn,
+      m.paper_url ? ["Paper / preprint", h("span", {}, h("a", { href: safeUrl(m.paper_url), target: "_blank", rel: "noopener noreferrer", text: m.paper_label || m.paper_url }), bibBtn, viewBibBtn,
         m.citation ? h("span", { class: "paper-cite", text: m.citation }) : null)] : null,
-      ["Weights / code", m.link ? h("a", { href: m.link, target: "_blank", rel: "noopener" }, m.hf_repo || m.link) : "—"],
+      ["Weights / code", m.link ? h("a", { href: safeUrl(m.link), target: "_blank", rel: "noopener noreferrer" }, m.hf_repo || m.link) : "—"],
       m.trident_name ? ["TRIDENT name", h("code", { text: m.trident_name })] : null,
       m.patch_encoder ? ["Patch encoder", h("code", { text: m.patch_encoder })] : null,
       ["Verified against", [...(m.source || "").split("+"), ...(m.weights && m.weights.length ? ["HFsize"] : [])].map(k => S.reg.verified_against[k] || k).join("; ")],
@@ -266,13 +665,16 @@
             }, `${ds.name} · ${(S.reg.dataset_cancer_sites && S.reg.dataset_cancer_sites[ds.cancer_site] ? S.reg.dataset_cancer_sites[ds.cancer_site].short + " · " : "")}${(S.reg.dataset_modalities[ds.modality_group] || {}).short || ds.regime}`))));
         })(),
         cli ? h("details", {}, h("summary", { class: "small", text: "Python / CLI quickstart" }), cliBlock(cli)) : null,
-        m.runner ? h("div", { style: "display:flex;gap:10px;flex-wrap:wrap" },
-          h("button", { class: "btn", onclick: () => { d.close(); go("run/" + encodeURIComponent(m.id)); } }, `Run ${m.name}`),
-          m.paper_url ? h("a", { class: "btn ghost", href: m.paper_url, target: "_blank", rel: "noopener" }, "Read paper") : null) : null));
+        h("div", { style: "display:flex;gap:10px;flex-wrap:wrap" },
+          m.runner ? h("button", { class: "btn", onclick: () => { d.close(); go("run/" + encodeURIComponent(m.id)); } }, `Run ${m.name}`) : null,
+          h("button", { type: "button", class: "btn ghost", "aria-pressed": String(pinned), onclick: () => toggleCompare(m.id) }, pinned ? "✓ Pinned to compare" : "+ Pin to compare"),
+          m.paper_url ? h("a", { class: "btn ghost", href: safeUrl(m.paper_url), target: "_blank", rel: "noopener noreferrer" }, "Read paper") : null)));
     if (!d.open && !keepOpen) d.showModal();
   }
   $("#drawer").addEventListener("click", e => { if (e.target.id === "drawer") e.target.close(); });
   $("#drawer").addEventListener("close", () => { S.drawerModel = null; });
+  $("#cmpModal").addEventListener("click", e => { if (e.target.id === "cmpModal") e.target.close(); });
+  $("#bibModal").addEventListener("click", e => { if (e.target.id === "bibModal") e.target.close(); });
 
   // ── run form ─────────────────────────────────────────────────────────
   const PRESETS = {
@@ -430,9 +832,20 @@
   // inputs
   const drop = $("#drop"), tf = $("#tileFiles");
   function setTiles(files) {
+    (S.tileUrls || []).forEach(u => { try { URL.revokeObjectURL(u); } catch { /* */ } });
+    S.tileUrls = [];
     S.run.tiles = [...files].filter(f => /^image\//.test(f.type) || /\.(tif|tiff)$/i.test(f.name));
-    $("#tileThumbs").replaceChildren(...S.run.tiles.slice(0, 40).map(f => h("img", { src: URL.createObjectURL(f), alt: f.name, title: f.name })),
-      S.run.tiles.length > 40 ? h("span", { class: "small muted", text: `+${S.run.tiles.length - 40} more` }) : "");
+    const imgs = S.run.tiles.slice(0, 40).map(f => {
+      const u = URL.createObjectURL(f);
+      S.tileUrls.push(u);
+      return h("img", { src: u, alt: f.name, title: f.name });
+    });
+    $("#tileThumbs").replaceChildren(
+      ...imgs,
+      S.run.tiles.length > 40 ? h("span", { class: "small muted", text: `+${S.run.tiles.length - 40} more` }) : null,
+      S.run.tiles.length ? h("span", { class: "small muted", text: `${S.run.tiles.length} tile${S.run.tiles.length === 1 ? "" : "s"}` }) : null,
+      S.run.tiles.length ? h("button", { type: "button", class: "btn ghost small", onclick: () => { tf.value = ""; setTiles([]); } }, "Clear") : null);
+    if (S.run.model && S.run.task) renderAside(S.run.model, S.run.task);
   }
   tf.addEventListener("change", () => setTiles(tf.files));
   drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tf.click(); } });
@@ -484,6 +897,8 @@
       try { S.jobs = await api("/api/jobs"); } catch (e) { S.jobs = []; }
     }
     const all = S.conn.mode === "demo" ? S.demoJobs : S.jobs;
+    const hasHashArg = (location.hash.slice(1).split("/")[1] || "").length > 0;
+    if (S.selJob && !all.some(j => j.id === S.selJob) && !hasHashArg) S.selJob = null;
     if (!S.selJob && all[0]) S.selJob = all[0].id;
     $("#jobList").replaceChildren(...(all.length ? all.map(j => h("li", {}, h("button", { "aria-current": String(j.id === S.selJob), onclick: () => go("results/" + j.id) },
       h("span", { class: "dot " + dotFor(j.status) }), h("span", { class: "t", text: (S.byId[j.model_id] || {}).name || j.model_id }),
@@ -496,15 +911,16 @@
   }
   $("#refreshJobs").addEventListener("click", refreshJobs);
 
-  let shownKey = "";
   async function showJob() {
     const box = $("#jobView");
     if (!S.selJob) { box.replaceChildren(h("div", { class: "empty" }, "Results appear here after you run a model.")); shownKey = ""; return; }
     let j;
     if (String(S.selJob).startsWith("demo")) j = S.demoJobs.find(x => x.id === S.selJob);
-    else { try { j = await api(`/api/jobs/${S.selJob}`); } catch (e) { box.replaceChildren(h("div", { class: "notice err", text: e.message })); return; } }
-    if (!j) { box.replaceChildren(h("div", { class: "empty", text: "That job is not on this server (jobs are kept until the server restarts)." })); return; }
-    const key = `${j.id}:${j.status}:${j.status === "running" || j.status === "queued" ? j.progress + j.stage : ""}`;
+    else if (S.conn.mode === "demo") j = null;
+    else { try { j = await api(`/api/jobs/${S.selJob}`); } catch (e) { box.replaceChildren(h("div", { class: "notice err", text: e.message })); shownKey = ""; return; } }
+    if (!j) { box.replaceChildren(h("div", { class: "empty", text: S.conn.mode === "demo" ? "No matching demo job in this browser tab. Run a model to generate synthetic results." : "That job is not on this server (jobs are kept until the server restarts)." })); shownKey = ""; return; }
+    const themeTag = isDarkTheme() ? "dark" : "light";
+    const key = `${themeTag}:${j.id}:${j.status}:${j.status === "running" || j.status === "queued" ? j.progress + j.stage : ""}`;
     if (key === shownKey) return;
     shownKey = key;
     const m = S.byId[j.model_id] || { name: j.model_id, category: "patch" };
@@ -535,8 +951,9 @@
   // ── connect ──────────────────────────────────────────────────────────
   function setPill(state, text) { $("#connDot").className = "dot " + state; $("#connText").textContent = text; }
   function renderConnect() {
-    document.querySelectorAll("#connForm [name=mode]").forEach(r => (r.checked = r.value === S.conn.mode));
-    $("#serverFields").hidden = S.conn.mode !== "server";
+    const activeMode = S.conn.mode === "demo" ? "demo" : "server";
+    document.querySelectorAll("#connForm [name=mode]").forEach(r => (r.checked = r.value === activeMode));
+    $("#serverFields").hidden = activeMode !== "server";
     $("#cUrl").value = S.conn.url; $("#cKey").value = S.conn.key; $("#cHf").value = S.conn.hf;
     $("#cRemember").checked = (() => { try { return !!localStorage.getItem("fm.key"); } catch { return false; } })();
     renderStatus(); renderLaunch(); renderWeightsCard();
@@ -595,7 +1012,8 @@
   }
   $("#connForm").addEventListener("submit", async e => {
     e.preventDefault();
-    S.conn.mode = document.querySelector("#connForm [name=mode]:checked").value;
+    const checkedMode = document.querySelector("#connForm [name=mode]:checked");
+    S.conn.mode = checkedMode ? checkedMode.value : "server";
     S.conn.url = $("#cUrl").value.trim() || "http://127.0.0.1:8000";
     S.conn.key = $("#cKey").value; S.conn.hf = $("#cHf").value.trim();
     store.set("fm.mode", S.conn.mode); store.set("fm.url", S.conn.url);
@@ -833,31 +1251,41 @@
     if (!box || !S.reg) return;
     const tbody = h("tbody");
     const copyAllBtn = h("button", { type: "button", class: "btn ghost small" });
-    const searchIn = h("input", { class: "search", type: "search", value: S.papers.q, placeholder: "Filter by model, author, journal, DOI or organ…" });
+    const dlAllBtn = h("button", { type: "button", class: "btn ghost small" });
+    const searchIn = h("input", { class: "search", type: "search", value: S.papers.q, placeholder: "Filter by model, arch, author, journal, DOI or organ…" });
     const spTabs = [["", "All (" + S.reg.models.length + ")"], ...SPECIES_ORDER.map(k => [k, `${SPECIES_META[k].label} (${S.reg.models.filter(m => m.species === k).length})`])];
     const spWrap = h("div", { class: "seg-ctl", role: "group", "aria-label": "Species scope" });
 
     const drawRows = () => {
-      const q = S.papers.q.toLowerCase();
+      const tokens = S.papers.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
       const sp = S.papers.species;
-      const list = S.reg.models.filter(m =>
-        (!sp || m.species === sp) &&
-        (!q || [m.name, m.developer, m.paper_label, m.citation, m.hf_repo, m.species_note, famLabel(m.category)].join(" ").toLowerCase().includes(q)));
+      const list = S.reg.models.filter(m => {
+        if (sp && m.species !== sp) return false;
+        if (!tokens.length) return true;
+        const hay = [m.name, m.developer, m.arch, m.params, m.licence, m.paper_label, m.citation, m.hf_repo, m.species_note, famLabel(m.category)].join(" ").toLowerCase();
+        return tokens.every(tok => hay.includes(tok));
+      });
       copyAllBtn.textContent = `Copy BibTeX (${list.length})`;
-      copyAllBtn.onclick = () => copyText(list.map(bibtexFor).join("\n\n"), copyAllBtn);
+      copyAllBtn.disabled = !list.length;
+      copyAllBtn.onclick = () => copyText(list.map(bibtexFor).join("\n\n"), copyAllBtn, "Filtered BibTeX");
+      dlAllBtn.textContent = `Download .bib (${list.length})`;
+      dlAllBtn.disabled = !list.length;
+      dlAllBtn.onclick = () => exportModelsBib(list, "histology_fm_papers");
       spWrap.replaceChildren(...spTabs.map(([k, l]) => h("button", { type: "button", "aria-pressed": String((S.papers.species || "") === k),
         onclick: () => { S.papers.species = k || null; drawRows(); } }, l)));
       tbody.replaceChildren(...(list.length ? list.map(m => {
-        const bBtn = h("button", { type: "button", class: "btn ghost small", onclick: () => copyText(bibtexFor(m), bBtn) }, "BibTeX");
+        const pinned = isPinned(m.id);
+        const bBtn = h("button", { type: "button", class: "btn ghost small", onclick: () => copyText(bibtexFor(m), bBtn, `${m.name} BibTeX`) }, "BibTeX");
+        const cBtn = h("button", { type: "button", class: "btn ghost small", "aria-pressed": String(pinned), onclick: () => toggleCompare(m.id) }, pinned ? "✓ Pinned" : "+ Compare");
         return h("tr", {},
           h("td", {}, h("button", { type: "button", class: "btn ghost small", style: "font-weight:700;padding:2px 6px", onclick: () => openDrawer(m) }, m.name),
-            h("span", { class: "paper-cite", text: m.developer })),
+            h("span", { class: "paper-cite", text: `${m.developer}${m.arch ? " · " + m.arch.split(" (")[0] : ""}` })),
           h("td", { text: famLabel(m.category) }),
           h("td", {}, speciesBadge(m) || h("span", { class: "small muted", text: "Human clinical" })),
-          h("td", {}, m.paper_url ? h("a", { href: m.paper_url, target: "_blank", rel: "noopener", text: m.paper_label || "Paper" }) : "—",
+          h("td", {}, m.paper_url ? h("a", { href: safeUrl(m.paper_url), target: "_blank", rel: "noopener noreferrer", text: m.paper_label || "Paper" }) : "—",
             m.citation ? h("span", { class: "paper-cite", text: m.citation }) : null),
-          h("td", {}, m.link ? h("a", { href: m.link, target: "_blank", rel: "noopener", text: m.hf_repo || "Repository" }) : "—"),
-          h("td", {}, bBtn));
+          h("td", {}, m.link ? h("a", { href: safeUrl(m.link), target: "_blank", rel: "noopener noreferrer", text: m.hf_repo || "Repository" }) : "—"),
+          h("td", {}, h("div", { style: "display:flex;gap:6px;flex-wrap:wrap" }, bBtn, cBtn)));
       }) : [h("tr", {}, h("td", { colspan: 6, class: "small muted", text: "No models match this search." }))]));
     };
     searchIn.addEventListener("input", e => { S.papers.q = e.target.value; drawRows(); });
@@ -868,8 +1296,8 @@
         h("h4", { text: b.name }), h("span", { class: "badge", text: b.species })),
       h("p", { text: b.scope }),
       h("div", { class: "bench-links" },
-        b.paper_url ? h("a", { href: b.paper_url, target: "_blank", rel: "noopener", text: `Paper (${b.paper_label})` }) : null,
-        b.data_url ? h("a", { href: b.data_url, target: "_blank", rel: "noopener", text: "Dataset / code" }) : null)));
+        b.paper_url ? h("a", { href: safeUrl(b.paper_url), target: "_blank", rel: "noopener noreferrer", text: `Paper (${b.paper_label})` }) : null,
+        b.data_url ? h("a", { href: safeUrl(b.data_url), target: "_blank", rel: "noopener noreferrer", text: "Dataset / code" }) : null)));
 
     const refs = (S.reg.literature_references || []).map(r => h("div", { class: "bench-card" },
       h("div", { style: "display:flex;justify-content:space-between;gap:8px;align-items:baseline" },
@@ -877,10 +1305,10 @@
       h("span", { class: "small muted", text: r.developer }),
       h("p", { text: r.scope }),
       h("div", { class: "bench-links" },
-        r.paper_url ? h("a", { href: r.paper_url, target: "_blank", rel: "noopener", text: r.paper_label }) : null)));
+        r.paper_url ? h("a", { href: safeUrl(r.paper_url), target: "_blank", rel: "noopener noreferrer", text: r.paper_label }) : null)));
 
     box.replaceChildren(
-      h("div", { class: "papers-toolbar" }, searchIn, spWrap, copyAllBtn),
+      h("div", { class: "papers-toolbar" }, searchIn, spWrap, copyAllBtn, dlAllBtn),
       h("div", { class: "card", style: "padding:0;overflow:hidden" },
         h("div", { class: "table-wrap", style: "max-height:560px" },
           h("table", { class: "data" },
@@ -955,7 +1383,8 @@
     const mm = modMeta(ds.modality_group);
     const cm = cancerMeta(ds.cancer_site);
     const spLabel = (SPECIES_META[ds.species] || SPECIES_META.human).label;
-    const bibBtn = h("button", { type: "button", class: "btn ghost small", style: "margin-left:8px", onclick: () => copyText(bibtexForDataset(ds), bibBtn) }, "Copy BibTeX");
+    const bibBtn = h("button", { type: "button", class: "btn ghost small", style: "margin-left:8px", onclick: () => copyText(bibtexForDataset(ds), bibBtn, `${ds.name} BibTeX`) }, "Copy BibTeX");
+    const viewBibBtn = h("button", { type: "button", class: "btn ghost small", style: "margin-left:6px", onclick: () => openBibModal(`${ds.name} — BibTeX`, bibtexForDataset(ds), `data_${ds.id.replace(/[^a-zA-Z0-9_]/g, "_")}.bib`) }, "View .bib");
     const compatModels = (ds.compatible_models || []).map(id => S.byId[id]).filter(Boolean);
     const rows = [
       ["Cancer scope", `${ds.cancer_scope === "pan_cancer" ? "Pan-Cancer" : "Organ-Specific"} — ${cm.label}`],
@@ -967,8 +1396,8 @@
       ["Scale", ds.scale],
       ["Species & cohort", `${spLabel} — ${ds.organs}`],
       ["Originating group", ds.developer],
-      ["Primary deposit", h("span", {}, h("a", { href: ds.data_url, target: "_blank", rel: "noopener", text: `${ds.source_label} (${ds.data_url.replace(/^https?:\/\//, "").slice(0, 48)})` }))],
-      ["Paper / descriptor", h("span", {}, h("a", { href: ds.paper_url, target: "_blank", rel: "noopener", text: ds.paper_label }), bibBtn,
+      ["Primary deposit", h("span", {}, h("a", { href: safeUrl(ds.data_url), target: "_blank", rel: "noopener noreferrer", text: `${ds.source_label} (${ds.data_url.replace(/^https?:\/\//, "").slice(0, 48)})` }))],
+      ["Paper / descriptor", h("span", {}, h("a", { href: safeUrl(ds.paper_url), target: "_blank", rel: "noopener noreferrer", text: ds.paper_label }), bibBtn, viewBibBtn,
         ds.citation ? h("span", { class: "paper-cite", text: ds.citation }) : null)],
       ["Licence", `${ds.licence} (${ds.commercial_use ? "commercial use allowed" : "academic / non-commercial terms"})`],
       ["Access", ds.gated ? "Terms / DUA acceptance required on host repository" : "Open direct download"],
@@ -1131,7 +1560,7 @@
     const resultsHolder = h("div");
 
     const filterData = () => {
-      const f = S.data, q = f.q.toLowerCase();
+      const f = S.data, tokens = f.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
       return all.filter(d => {
         if (!matchesCancerFilter(d, f.cancer)) return false;
         if (f.mod === "matched" && d.regime !== "matched") return false;
@@ -1141,12 +1570,12 @@
         if (f.species && d.species !== f.species) return false;
         if (f.commercial && !d.commercial_use) return false;
         if (f.ungated && d.gated) return false;
-        if (!q) return true;
+        if (!tokens.length) return true;
         const modelNames = (d.compatible_models || []).map(id => (S.byId[id] || {}).name || id).join(" ");
         const hay = [d.name, d.developer, cancerMeta(d.cancer_site).label, d.cancer_scope, d.tumor_types,
           modMeta(d.modality_group).label, d.regime, (d.modalities || []).join(" "),
           d.pairing, d.source_label, d.organs, d.scale, d.licence, d.paper_label, d.citation, d.description, d.data_url, modelNames].join(" ").toLowerCase();
-        return hay.includes(q);
+        return tokens.every(tok => hay.includes(tok));
       });
     };
 
@@ -1279,7 +1708,7 @@
                 h("div", { style: "display:flex;justify-content:space-between;gap:6px;align-items:flex-start;flex-wrap:wrap" },
                   h("span", { style: "display:flex;gap:5px;flex-wrap:wrap" }, cancerBadge(it.site), modBadge(it.mod)),
                   h("span", { class: "hub-badge", text: it.hub })),
-                h("h4", { style: "margin-top:4px" }, h("a", { href: it.url, target: "_blank", rel: "noopener", text: it.title })),
+                h("h4", { style: "margin-top:4px" }, h("a", { href: safeUrl(it.url), target: "_blank", rel: "noopener noreferrer", text: it.title })),
                 it.sub ? h("span", { class: "small muted", text: it.sub }) : null,
                 it.desc ? h("p", { text: it.desc }) : null,
                 h("div", { class: "bench-links", style: "justify-content:space-between" },
@@ -1324,8 +1753,9 @@
     catch (e) { $("#rack").replaceChildren(h("div", { class: "notice err", text: "Could not load models.json. Serve this folder over HTTP (GitHub Pages, or python -m http.server) rather than opening the file directly." })); return; }
     S.reg.models.forEach(m => (S.byId[m.id] = m));
     (S.reg.open_datasets || []).forEach(d => (S.dataById[d.id] = d));
+    S.cmp = S.cmp.filter(id => S.byId[id]).slice(0, MAX_CMP);
     renderCounts(); renderFamilies(); renderSpecies(); fillModelSelect();
-    renderHwBar();
+    renderHwBar(); renderCompareDock();
     HW.detectBrowser().then(b => { S.bhw = b; renderHwBar(); renderRack(); if (S.run.model && !$("#view-run").hidden) renderAside(S.run.model, S.run.task); if (!$("#view-connect").hidden) renderLaunch(); });
     // Arriving from the installer: #setup&url=…&key=… (the fragment never leaves the browser)
     let wizardFrom = null;
@@ -1339,10 +1769,10 @@
     }
     await autoConnect();
     renderRack();
-    window.addEventListener("hashchange", route);
-    route();
+    window.addEventListener("hashchange", () => route(false));
+    route(false);
     window.Portal = { S, api, connect, go, fitFor, refreshWeights, setPill, renderHwBar, renderRack, renderWeightsCard, store,
-      findServer, base, onLocalhost };
+      findServer, base, onLocalhost, toggleCompare, openCompareModal, exportModelsBib, exportModelsCsv };
     window.dispatchEvent(new CustomEvent("portal-ready", { detail: { wizardFrom } }));
   })();
 })();

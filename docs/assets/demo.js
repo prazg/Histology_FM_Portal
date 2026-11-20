@@ -181,11 +181,13 @@
         panels.push({ type: "table", title: "Ranked by spatial variability", columns: ["Name", "Mean", "SD"],
           rows: names.map((n, j) => { const v = cols[j], m = v.reduce((a, b) => a + b, 0) / v.length; return [n, +m.toFixed(4), +Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / v.length).toFixed(4)]; }).sort((a, b) => b[2] - a[2]) });
       } else if (task === "slide_embed" || task === "slide_zeroshot") {
+        const sdim = Number(model.slide_dim || model.embed_dim) || 768;
+        summary.push({ label: "Slide dim", value: sdim });
         if (task === "slide_zeroshot") {
           const cls = parseClasses(params.classes);
           panels.push({ type: "bars", title: "Zero-shot scores", labels: cls, rows: ["Slide"], values: [softmax(cls.map(() => r() * 4))], percent: true });
         }
-        panels.push({ type: "vector", title: `${model.name} slide embedding (768-d)`, values: Array.from({ length: 768 }, () => (r() - .5) * 2 * Math.exp(-r() * 2)) });
+        panels.push({ type: "vector", title: `${model.name} slide embedding (${sdim}-d)`, values: Array.from({ length: sdim }, () => (r() - .5) * 2 * Math.exp(-r() * 2)) });
         panels.push({ type: "image", title: "Slide thumbnail", src: thumb });
       } else if (task === "segment_wsi") {
         panels.push({ type: "image", title: model.runner === "tisam" ? "TiSAM (MegaMouse) multi-compartment segmentation" : "Tissue segmentation", src: thumb });

@@ -68,9 +68,10 @@
     <div class="hw-bar" id="hwBar" aria-live="polite"></div>
     <div class="cat-layout">
       <aside class="filters" aria-label="Filter models">
-        <div>
+        <div class="search-wrap">
           <label class="sr-only" for="q">Search models</label>
-          <input id="q" class="search" type="search" placeholder="Search name, lab, species or paper">
+          <input id="q" class="search" type="search" placeholder="Search name, arch, lab, species or paper">
+          <kbd class="kbd-hint" id="qKbd" aria-hidden="true" title="Press / to focus search">/</kbd>
         </div>
         <div>
           <h3>Model family</h3>
@@ -89,7 +90,10 @@
         </div>
         <p class="small muted">Weights, dimensions and licences checked on <span id="regDate"></span> against the TRIDENT encoder tables and each model card. Licences change — read the model card before publishing results.</p>
       </aside>
-      <div id="rack"></div>
+      <div class="cat-main">
+        <div class="cat-toolbar" id="catToolbar" aria-live="polite"></div>
+        <div id="rack"></div>
+      </div>
     </div>
   </section>
 
@@ -217,10 +221,13 @@
 
 <footer>
   Research use only — not for clinical decision-making. Most weights here are licensed for non-commercial use; each model card is linked from its slide.
-  Built on <a href="https://github.com/mahmoodlab/TRIDENT">TRIDENT</a> for slide handling and encoder loading.
+  Built on <a href="https://github.com/mahmoodlab/TRIDENT" target="_blank" rel="noopener noreferrer">TRIDENT</a> for slide handling and encoder loading.
 </footer>
 
-<dialog class="drawer" id="drawer" aria-labelledby="drawerTitle"></dialog>
+<aside class="cmp-dock" id="cmpDock" aria-label="Model comparison dock" hidden></aside>
+<dialog class="drawer" id="drawer" aria-labelledby="drawerTitle"><h2 id="drawerTitle" class="sr-only">Model details</h2></dialog>
+<dialog class="cmp-modal" id="cmpModal" aria-labelledby="cmpModalTitle"><h2 id="cmpModalTitle" class="sr-only">Side-by-side model comparison</h2></dialog>
+<dialog class="bib-modal" id="bibModal" aria-labelledby="bibModalTitle"><h2 id="bibModalTitle" class="sr-only">BibTeX citation</h2></dialog>
 <dialog class="wizard" id="wizard" aria-label="Server setup"></dialog>
 
 <script src="assets/viewers.js"></script>

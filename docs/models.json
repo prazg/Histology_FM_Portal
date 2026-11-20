@@ -172,7 +172,9 @@
       "paper_url": "https://doi.org/10.1038/s41591-024-02857-3",
       "citation": "Chen et al., Towards a general-purpose foundation model for computational pathology, Nature Medicine (2024)",
       "species": "multi-species",
-      "species_note": "Human pretraining (Mass-100K); widely validated cross-species encoder on mouse HEST-1k & DeepSpot-M."
+      "species_note": "Human pretraining (Mass-100K); widely validated cross-species encoder on mouse HEST-1k & DeepSpot-M.",
+      "arch": "ViT-L/16 (DINOv2)",
+      "params": "303M"
     },
     {
       "id": "uni_v2",
@@ -214,7 +216,9 @@
       "paper_url": "https://doi.org/10.1038/s41591-024-02857-3",
       "citation": "Chen et al., Towards a general-purpose foundation model for computational pathology (UNI2-h), Nature Medicine (2024)",
       "species": "multi-species",
-      "species_note": "Human pretraining (>200M tiles); top cross-species transfer backbone on rodent VIPER, HEST-1k, and TiSAM/MegaMouse."
+      "species_note": "Human pretraining (>200M tiles); top cross-species transfer backbone on rodent VIPER, HEST-1k, and TiSAM/MegaMouse.",
+      "arch": "ViT-H/14 (DINOv2, reg8)",
+      "params": "681M"
     },
     {
       "id": "conch_v15",
@@ -256,7 +260,9 @@
       "paper_url": "https://doi.org/10.1038/s41591-025-03982-3",
       "citation": "Ding et al. / Lu et al., Multimodal whole-slide foundation model for pathology (CONCH v1.5 / TITAN), Nature Medicine (2025)",
       "species": "multi-species",
-      "species_note": "Human vision-language pretraining; benchmarked for cross-species transfer on rodent VIPER & HEST-1k."
+      "species_note": "Human vision-language pretraining; benchmarked for cross-species transfer on rodent VIPER & HEST-1k.",
+      "arch": "ViT-L/16 (Vision tower)",
+      "params": "307M"
     },
     {
       "id": "virchow",
@@ -298,7 +304,9 @@
       "paper_url": "https://doi.org/10.1038/s41591-024-03141-0",
       "citation": "Vorontsov et al., A foundation model for clinical-grade computational pathology and rare cancers detection, Nature Medicine (2024)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "ViT-H/14 (DINOv2)",
+      "params": "632M"
     },
     {
       "id": "virchow2",
@@ -340,7 +348,9 @@
       "paper_url": "https://arxiv.org/abs/2408.00738",
       "citation": "Zimmermann et al., Virchow2: Scaling Self-Supervised Mixed Magnification Models in Pathology, arXiv:2408.00738 (2024)",
       "species": "multi-species",
-      "species_note": "3.1M WSI mixed-magnification encoder (5x–40x); validated on preclinical rodent & multi-stain benchmarks."
+      "species_note": "3.1M WSI mixed-magnification encoder (5x–40x); validated on preclinical rodent & multi-stain benchmarks.",
+      "arch": "ViT-H/14 (DINOv2, reg4)",
+      "params": "632M"
     },
     {
       "id": "virchow2-cls",
@@ -382,7 +392,9 @@
       "paper_url": "https://arxiv.org/abs/2408.00738",
       "citation": "Zimmermann et al., Virchow2: Scaling Self-Supervised Mixed Magnification Models in Pathology, arXiv:2408.00738 (2024)",
       "species": "multi-species",
-      "species_note": "CLS-token variant of Virchow2 (1280-d); mixed-magnification transfer across human and preclinical slides."
+      "species_note": "CLS-token variant of Virchow2 (1280-d); mixed-magnification transfer across human and preclinical slides.",
+      "arch": "ViT-H/14 (DINOv2, CLS)",
+      "params": "632M"
     },
     {
       "id": "phikon",
@@ -425,7 +437,9 @@
       "paper_url": "https://doi.org/10.1101/2023.07.21.23292757",
       "citation": "Filiot et al., Scaling Self-Supervised Learning for Histopathology with Masked Image Modeling, medRxiv (2023)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "ViT-B/16 (iBOT)",
+      "params": "86M"
     },
     {
       "id": "phikon_v2",
@@ -468,7 +482,9 @@
       "paper_url": "https://arxiv.org/abs/2409.09173",
       "citation": "Filiot et al., Phikon-v2, A large and public feature extractor for biomarker prediction, arXiv:2409.09173 (2024)",
       "species": "multi-species",
-      "species_note": "Ungated DINOv2 ViT-L/16 trained on PANCAN-XL; benchmarked for zero-shot/linear transfer on rodent slides."
+      "species_note": "Ungated DINOv2 ViT-L/16 trained on PANCAN-XL; benchmarked for zero-shot/linear transfer on rodent slides.",
+      "arch": "ViT-L/16 (DINOv2)",
+      "params": "303M"
     },
     {
       "id": "gigapath",
@@ -510,7 +526,9 @@
       "paper_url": "https://doi.org/10.1038/s41586-024-07441-w",
       "citation": "Xu et al., A whole-slide foundation model for digital pathology from real-world data, Nature (2024)",
       "species": "multi-species",
-      "species_note": "1.3B real-world tile encoder; evaluated in cross-species HEST-1k and rodent transfer studies."
+      "species_note": "1.3B real-world tile encoder; evaluated in cross-species HEST-1k and rodent transfer studies.",
+      "arch": "ViT-g/14 (DINOv2)",
+      "params": "1.13B"
     },
     {
       "id": "gigapath-flash",
@@ -552,7 +570,9 @@
       "paper_url": "https://arxiv.org/abs/2607.18218",
       "citation": "Usuyama et al., GigaPath-Flash and GigaTIME-Flash: Efficient Pathology Foundation Models, arXiv:2607.18218 (2026)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "ViT-S/16 (Distilled)",
+      "params": "22M"
     },
     {
       "id": "hoptimus0",
@@ -594,7 +614,9 @@
       "paper_url": "https://github.com/bioptimus/releases/tree/main/models/h-optimus/v0",
       "citation": "Saillard et al., H-optimus-0: An Open-Source Foundation Model for Histology, Bioptimus (2024)",
       "species": "multi-species",
-      "species_note": "1.1B ViT-g/14 encoder; strong cross-species morphological representation on HEST-1k mouse/human benchmarks."
+      "species_note": "1.1B ViT-g/14 encoder; strong cross-species morphological representation on HEST-1k mouse/human benchmarks.",
+      "arch": "ViT-g/14 (DINOv2, reg4)",
+      "params": "1.13B"
     },
     {
       "id": "hoptimus1",
@@ -636,7 +658,9 @@
       "paper_url": "https://github.com/bioptimus/releases/tree/main/models/h-optimus/v1",
       "citation": "Bioptimus Team, H-optimus-1: Next-Generation Foundation Model for Histology, Bioptimus (2025)",
       "species": "multi-species",
-      "species_note": "1.1B ViT-g/14 encoder (>1M slides); top linear-probe cross-species transfer encoder on rodent VIPER & HEST-1k."
+      "species_note": "1.1B ViT-g/14 encoder (>1M slides); top linear-probe cross-species transfer encoder on rodent VIPER & HEST-1k.",
+      "arch": "ViT-g/14 (DINOv2, reg4)",
+      "params": "1.13B"
     },
     {
       "id": "h0-mini",
@@ -678,7 +702,9 @@
       "paper_url": "https://arxiv.org/abs/2501.16239",
       "citation": "Filiot / Bioptimus et al., Distilling foundation models for robust and efficient models in digital pathology, arXiv:2501.16239 (2025)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "ViT-B/14 (Distilled DINOv2)",
+      "params": "86M"
     },
     {
       "id": "midnight12k",
@@ -720,7 +746,9 @@
       "paper_url": "https://arxiv.org/abs/2504.05176",
       "citation": "Karasikov et al., Training state-of-the-art pathology foundation models with orders of magnitude less data (Midnight), arXiv:2504.05176 (2025)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "ViT-g/14 (DINOv2)",
+      "params": "1.14B"
     },
     {
       "id": "openmidnight",
@@ -761,7 +789,9 @@
       "paper_url": "https://arxiv.org/abs/2611.00064",
       "citation": "MedARC & Sophont AI, OpenMidnight: Closing the Performance Gap Between Open and Proprietary Pathology FMs, arXiv:2611.00064 (2026)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "ViT-g/14 (DINOv2)",
+      "params": "1.13B"
     },
     {
       "id": "gpfm",
@@ -802,7 +832,9 @@
       "paper_url": "https://doi.org/10.1038/s41551-025-01388-7",
       "citation": "Ma et al., Towards a generalizable pathology foundation model via unified knowledge distillation (GPFM), Nature Biomedical Engineering (2025)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "ViT-L/14 (Distilled MIM)",
+      "params": "303M"
     },
     {
       "id": "genbio-pathfm",
@@ -843,7 +875,9 @@
       "paper_url": "https://doi.org/10.64898/2026.03.17.712534",
       "citation": "Kapse et al., GenBio-PathFM: A State-of-the-Art Foundation Model for Histopathology, bioRxiv (2026)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "ViT-g/14 (Multi-token)",
+      "params": "1.13B"
     },
     {
       "id": "hibou_l",
@@ -888,7 +922,9 @@
       "paper_url": "https://arxiv.org/abs/2406.05074",
       "citation": "Nechaev et al., Hibou: A Family of Foundational Vision Transformers for Pathology, arXiv:2406.05074 (2024)",
       "species": "multi-species",
-      "species_note": "Explicitly co-trained on >1.1M human and veterinary biopsy WSIs across H&E, IHC, and special stains."
+      "species_note": "Explicitly co-trained on >1.1M human and veterinary biopsy WSIs across H&E, IHC, and special stains.",
+      "arch": "ViT-L/14 (DINOv2, reg4)",
+      "params": "304M"
     },
     {
       "id": "hibou_b",
@@ -931,7 +967,9 @@
       "paper_url": "https://arxiv.org/abs/2406.05074",
       "citation": "Nechaev et al., Hibou: A Family of Foundational Vision Transformers for Pathology, arXiv:2406.05074 (2024)",
       "species": "multi-species",
-      "species_note": "Explicitly co-trained on human and veterinary pathology slides."
+      "species_note": "Explicitly co-trained on human and veterinary pathology slides.",
+      "arch": "ViT-B/14 (DINOv2, reg4)",
+      "params": "86M"
     },
     {
       "id": "phaet",
@@ -974,7 +1012,9 @@
       "paper_url": "https://arxiv.org/abs/2607.22861",
       "citation": "Filiot et al., Robustifying pathology foundation models via fine-tuning (Phaet & Mascaret), arXiv:2607.22861 (2026)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "ViT-L/16 (Fine-tuned DINOv2)",
+      "params": "303M"
     },
     {
       "id": "mascaret",
@@ -1017,7 +1057,9 @@
       "paper_url": "https://arxiv.org/abs/2607.22861",
       "citation": "Filiot et al., Robustifying pathology foundation models via fine-tuning (Phaet & Mascaret), arXiv:2607.22861 (2026)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "ViT-g/14 (Fine-tuned DINOv2)",
+      "params": "1.14B"
     },
     {
       "id": "lunit-vits8",
@@ -1059,7 +1101,9 @@
       "paper_url": "https://doi.org/10.1109/CVPR52729.2023.00326",
       "citation": "Kang et al., Benchmarking Self-Supervised Learning on Diverse Pathology Datasets, CVPR (2023)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "ViT-S/8 (DINO)",
+      "params": "22M"
     },
     {
       "id": "kaiko-vits8",
@@ -1101,7 +1145,9 @@
       "paper_url": "https://arxiv.org/abs/2404.15217",
       "citation": "Breen / Abousamra / Kaiko AI, Towards Large-Scale Training of Pathology Foundation Models, arXiv:2404.15217 (2024)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "ViT-S/8 (DINOv2)",
+      "params": "22M"
     },
     {
       "id": "kaiko-vits16",
@@ -1143,7 +1189,9 @@
       "paper_url": "https://arxiv.org/abs/2404.15217",
       "citation": "Kaiko AI, Towards Large-Scale Training of Pathology Foundation Models, arXiv:2404.15217 (2024)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "ViT-S/16 (DINOv2)",
+      "params": "22M"
     },
     {
       "id": "kaiko-vitb8",
@@ -1185,7 +1233,9 @@
       "paper_url": "https://arxiv.org/abs/2404.15217",
       "citation": "Kaiko AI, Towards Large-Scale Training of Pathology Foundation Models, arXiv:2404.15217 (2024)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "ViT-B/8 (DINOv2)",
+      "params": "86M"
     },
     {
       "id": "kaiko-vitb16",
@@ -1227,7 +1277,9 @@
       "paper_url": "https://arxiv.org/abs/2404.15217",
       "citation": "Kaiko AI, Towards Large-Scale Training of Pathology Foundation Models, arXiv:2404.15217 (2024)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "ViT-B/16 (DINOv2)",
+      "params": "86M"
     },
     {
       "id": "kaiko-vitl14",
@@ -1269,7 +1321,9 @@
       "paper_url": "https://arxiv.org/abs/2404.15217",
       "citation": "Kaiko AI, Towards Large-Scale Training of Pathology Foundation Models, arXiv:2404.15217 (2024)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "ViT-L/14 (DINOv2, reg4)",
+      "params": "304M"
     },
     {
       "id": "ctranspath",
@@ -1310,7 +1364,9 @@
       "paper_url": "https://doi.org/10.1016/j.media.2022.102559",
       "citation": "Wang et al., Transformer-based unsupervised contrastive learning for histopathological image classification (CTransPath), MedIA (2023)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "Swin-Tiny + CNN Stem (SRCL)",
+      "params": "28M"
     },
     {
       "id": "resnet50",
@@ -1352,7 +1408,9 @@
       "paper_url": "https://doi.org/10.1109/CVPR.2016.90",
       "citation": "He et al., Deep Residual Learning for Image Recognition, CVPR (2016)",
       "species": "multi-species",
-      "species_note": "Species-agnostic ImageNet natural-image baseline."
+      "species_note": "Species-agnostic ImageNet natural-image baseline.",
+      "arch": "ResNet-50 (Stage-3 Pool)",
+      "params": "25.6M"
     },
     {
       "id": "conch_v1",
@@ -1396,7 +1454,9 @@
       "paper_url": "https://doi.org/10.1038/s41591-024-02856-4",
       "citation": "Lu et al., A visual-language foundation model for computational pathology (CONCH), Nature Medicine (2024)",
       "species": "multi-species",
-      "species_note": "Trained on 1.17M biomedical image-caption pairs (incl. experimental pathology figures); strong rodent zero-shot transfer."
+      "species_note": "Trained on 1.17M biomedical image-caption pairs (incl. experimental pathology figures); strong rodent zero-shot transfer.",
+      "arch": "CoCa ViT-B/16 + Text",
+      "params": "200M"
     },
     {
       "id": "musk",
@@ -1440,7 +1500,9 @@
       "paper_url": "https://doi.org/10.1038/s41586-024-08378-w",
       "citation": "Xiang et al., A vision-language foundation model for precision oncology (MUSK), Nature (2025)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "BEiT-3 Unified ViT-L",
+      "params": "675M"
     },
     {
       "id": "keep",
@@ -1488,7 +1550,9 @@
       "paper_url": "https://arxiv.org/abs/2412.13126",
       "citation": "Zhou et al., A Knowledge-Enhanced Pathology Vision-Language Foundation Model for Cancer Diagnosis (KEEP), arXiv:2412.13126 (2024)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "ViT-L/16 + PubMedBERT",
+      "params": "414M"
     },
     {
       "id": "plip",
@@ -1537,7 +1601,9 @@
       "paper_url": "https://doi.org/10.1038/s41591-023-02504-3",
       "citation": "Huang et al., A visual-language foundation model for pathology image analysis using medical Twitter (PLIP), Nature Medicine (2023)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "CLIP ViT-B/32 + Text",
+      "params": "151M"
     },
     {
       "id": "quiltnet_b32",
@@ -1587,7 +1653,9 @@
       "paper_url": "https://arxiv.org/abs/2306.11207",
       "citation": "Ikezogwo et al., Quilt-1M: One Million Image-Text Pairs for Histopathology, NeurIPS (2023)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "CLIP ViT-B/32 + Text",
+      "params": "151M"
     },
     {
       "id": "loki",
@@ -1631,7 +1699,9 @@
       "paper_url": "https://doi.org/10.1038/s41592-025-02707-1",
       "citation": "Chen et al., A visual-omics foundation model to bridge histopathology with spatial transcriptomics (Loki / OmiCLIP), Nature Methods (2025)",
       "species": "multi-species",
-      "species_note": "Trained & validated on mouse and human H&E + spatial transcriptomics (ST-bank)."
+      "species_note": "Trained & validated on mouse and human H&E + spatial transcriptomics (ST-bank).",
+      "arch": "CoCa ViT-L/14 + Text",
+      "params": "638M"
     },
     {
       "id": "tissuedecision_9b",
@@ -1673,9 +1743,11 @@
       "runtime_weights_gb": 18.2,
       "paper_label": "arXiv:2608.26382",
       "paper_url": "https://arxiv.org/abs/2608.26382",
-      "citation": "TissueDecision-9B: Grounded Multimodal Reasoning for Preclinical Rodent Toxicologic Pathology, arXiv:2608.26382 (2026)",
+      "citation": "LightEternal et al., TissueDecision-9B: Grounded Multimodal Reasoning for Preclinical Rodent Toxicologic Pathology, arXiv:2608.26382 (2026)",
       "species": "rodent",
-      "species_note": "Purpose-trained on rat and mouse preclinical toxicology slides (Open TG-GATEs, NTP CEBS, TissueDecision-Data)."
+      "species_note": "Purpose-trained on rat and mouse preclinical toxicology slides (Open TG-GATEs, NTP CEBS, TissueDecision-Data).",
+      "arch": "Multimodal VLM (SigLIP + 9B LLM)",
+      "params": "9B"
     },
     {
       "id": "slide:titan",
@@ -1729,7 +1801,10 @@
       "paper_url": "https://doi.org/10.1038/s41591-025-03982-3",
       "citation": "Ding et al., Multimodal whole-slide foundation model for pathology (TITAN), Nature Medicine (2025)",
       "species": "multi-species",
-      "species_note": "Whole-slide VLM over CONCH v1.5; evaluated on cross-species whole-slide zero-shot tasks (VIPER)."
+      "species_note": "Whole-slide VLM over CONCH v1.5; evaluated on cross-species whole-slide zero-shot tasks (VIPER).",
+      "arch": "Slide Transformer + Text (over CONCH v1.5)",
+      "params": "159M (+307M tile)",
+      "slide_dim": 768
     },
     {
       "id": "slide:prism",
@@ -1778,7 +1853,10 @@
       "paper_url": "https://arxiv.org/abs/2405.10254",
       "citation": "Shaikovski et al., PRISM: A Multi-Modal Generative Foundation Model for Slide-Level Histopathology, arXiv:2405.10254 (2024)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "Perceiver + BioGPT (over Virchow)",
+      "params": "558M (+632M tile)",
+      "slide_dim": 1280
     },
     {
       "id": "slide:prism2",
@@ -1833,7 +1911,10 @@
       "paper_url": "https://arxiv.org/abs/2506.13063",
       "citation": "Shaikovski et al., PRISM2: Unlocking Multi-Modal General Pathology AI with Clinical Dialogue, arXiv:2506.13063 (2025)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "Perceiver + Multimodal LLM (over Virchow2)",
+      "params": "8.9B (+632M tile)",
+      "slide_dim": 2560
     },
     {
       "id": "slide:chief",
@@ -1873,7 +1954,10 @@
       "paper_url": "https://doi.org/10.1038/s41586-024-07894-z",
       "citation": "Wang et al., A pathology foundation model for cancer diagnosis and prognosis prediction (CHIEF), Nature (2024)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "Attention MIL + Anatomy Prompt (over CTransPath)",
+      "params": "1.5M (+28M tile)",
+      "slide_dim": 768
     },
     {
       "id": "slide:gigapath",
@@ -1916,7 +2000,10 @@
       "paper_url": "https://doi.org/10.1038/s41586-024-07441-w",
       "citation": "Xu et al., A whole-slide foundation model for digital pathology from real-world data (Prov-GigaPath), Nature (2024)",
       "species": "multi-species",
-      "species_note": "LongNet slide aggregator over GigaPath tiles; applicable to large rodent & human WSIs."
+      "species_note": "LongNet slide aggregator over GigaPath tiles; applicable to large rodent & human WSIs.",
+      "arch": "LongNet Dilated Transformer (over GigaPath)",
+      "params": "86M (+1.13B tile)",
+      "slide_dim": 768
     },
     {
       "id": "slide:gigapath-flash",
@@ -1959,7 +2046,10 @@
       "paper_url": "https://arxiv.org/abs/2607.18218",
       "citation": "Usuyama et al., GigaPath-Flash and GigaTIME-Flash: Efficient Pathology Foundation Models, arXiv:2607.18218 (2026)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "LongNet-Flash Aggregator (over GigaPath-Flash)",
+      "params": "21M (+22M tile)",
+      "slide_dim": 384
     },
     {
       "id": "slide:madeleine",
@@ -2003,7 +2093,10 @@
       "paper_url": "https://arxiv.org/abs/2408.02859",
       "citation": "Jaume et al., Multistain Pretraining for Slide Representation Learning in Pathology (MADELEINE), ECCV (2024)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "Multi-Stain ABMIL Transformer (over CONCH)",
+      "params": "5M (+200M tile)",
+      "slide_dim": 512
     },
     {
       "id": "slide:feather",
@@ -2050,7 +2143,10 @@
       "paper_url": "https://openreview.net/forum?id=G1hIwsiWon",
       "citation": "Mahmood Lab, Do Multiple Instance Learning Models Transfer? (FEATHER), ICML (2025)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "Gated ABMIL (over CONCH v1.5)",
+      "params": "0.8M (+307M tile)",
+      "slide_dim": 512
     },
     {
       "id": "slide:feather_uni_v2",
@@ -2097,7 +2193,10 @@
       "paper_url": "https://openreview.net/forum?id=G1hIwsiWon",
       "citation": "Mahmood Lab, Do Multiple Instance Learning Models Transfer? (FEATHER), ICML (2025)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "Gated ABMIL (over UNI2-h)",
+      "params": "1.3M (+681M tile)",
+      "slide_dim": 512
     },
     {
       "id": "slide:care",
@@ -2145,7 +2244,10 @@
       "paper_url": "https://arxiv.org/abs/2602.21637",
       "citation": "CARE Team, CARE: A Molecular-Guided Foundation Model with Adaptive Region Modeling for WSI Analysis, arXiv:2602.21637 (2026)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "Adaptive Region Transformer (over CONCH v1.5)",
+      "params": "19M (+307M tile)",
+      "slide_dim": 768
     },
     {
       "id": "gigatime",
@@ -2216,7 +2318,9 @@
       "paper_url": "https://doi.org/10.1016/j.cell.2025.11.016",
       "citation": "Valanarasu et al., Multimodal AI generates virtual population for tumor microenvironment modeling (GigaTIME), Cell (2025)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "Dense U-Net Translation",
+      "params": "19M"
     },
     {
       "id": "gigatime-flash",
@@ -2269,7 +2373,9 @@
       "paper_url": "https://arxiv.org/abs/2607.18218",
       "citation": "Usuyama et al., GigaPath-Flash and GigaTIME-Flash: Efficient Pathology Foundation Models, arXiv:2607.18218 (2026)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "Distilled Virtual mIF Network",
+      "params": "Lightweight"
     },
     {
       "id": "hex_nolan48",
@@ -2365,7 +2471,9 @@
       "paper_url": "https://doi.org/10.1038/s41591-025-04060-4",
       "citation": "Li Lab (Stanford), AI-enabled virtual spatial proteomics from histopathology for interpretable biomarker discovery (HEX), Nature Medicine (2025)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "Spatial Proteomics Head (over MUSK)",
+      "params": "51M (+675M MUSK)"
     },
     {
       "id": "stpath",
@@ -2410,7 +2518,9 @@
       "paper_url": "https://doi.org/10.1038/s41746-025-02020-3",
       "citation": "Huang et al., STPath: A Generative Foundation Model for Integrating Spatial Transcriptomics and Whole Slide Images, npj Digital Medicine (2025)",
       "species": "human",
-      "species_note": null
+      "species_note": null,
+      "arch": "Generative Transformer (over GigaPath)",
+      "params": "49M (+1.13B GigaPath)"
     },
     {
       "id": "deepspot_m",
@@ -2452,7 +2562,9 @@
       "paper_url": "https://doi.org/10.64898/2026.06.19.26356060",
       "citation": "Nonchev et al. (Rätsch Lab), DeepSpot-M: Cross-Species Spatial Transcriptomics Prediction for Mouse Histopathology, medRxiv (2026)",
       "species": "rodent",
-      "species_note": "Purpose-built for Mus musculus spatial gene expression prediction from H&E."
+      "species_note": "Purpose-built for Mus musculus spatial gene expression prediction from H&E.",
+      "arch": "Spot-Context Predictor (over UNI)",
+      "params": "62M (+303M UNI)"
     },
     {
       "id": "seg:hest",
@@ -2488,7 +2600,9 @@
       "paper_url": "https://arxiv.org/abs/2406.16192",
       "citation": "Jaume et al., HEST-1k: A Dataset for Spatial Transcriptomics and Histology Image Analysis, NeurIPS (2024)",
       "species": "multi-species",
-      "species_note": "Trained on HEST-1k (Homo sapiens + Mus musculus tissues across H&E and frozen sections)."
+      "species_note": "Trained on HEST-1k (Homo sapiens + Mus musculus tissues across H&E and frozen sections).",
+      "arch": "DeepLabV3 (ResNet-50)",
+      "params": "42M"
     },
     {
       "id": "seg:grandqc",
@@ -2524,7 +2638,9 @@
       "paper_url": "https://doi.org/10.1038/s41467-024-54769-y",
       "citation": "Weng et al., GrandQC: A comprehensive solution to quality control problem in digital pathology, Nature Communications (2024)",
       "species": "multi-species",
-      "species_note": "Species-agnostic H&E tissue segmentation & artifact quality control."
+      "species_note": "Species-agnostic H&E tissue segmentation & artifact quality control.",
+      "arch": "UNet++ Tissue & QC Segmenter",
+      "params": "7M"
     },
     {
       "id": "tisam_megamouse",
@@ -2566,7 +2682,9 @@
       "paper_url": "https://doi.org/10.64898/2026.10.16.759688",
       "citation": "Kiemen Lab, TiSAM & MegaMouse: Pan-Organ Multi-Class Tissue Segmentation in Mouse Histopathology, bioRxiv (2026)",
       "species": "rodent",
-      "species_note": "Trained on MegaMouse (52 mouse tissue compartments across 12 Mus musculus organs)."
+      "species_note": "Trained on MegaMouse (52 mouse tissue compartments across 12 Mus musculus organs).",
+      "arch": "SAM Decoder (over UNI2-h)",
+      "params": "95M (+681M UNI2-h)"
     },
     {
       "id": "seg:otsu",
@@ -2596,7 +2714,9 @@
       "paper_url": "https://doi.org/10.1109/TSMC.1979.4310076",
       "citation": "Otsu, A Threshold Selection Method from Gray-Level Histograms, IEEE Trans. Syst. Man Cybern. (1979)",
       "species": "multi-species",
-      "species_note": "Classical intensity thresholding; works across any species."
+      "species_note": "Classical intensity thresholding; works across any species.",
+      "arch": "Classical Otsu Threshold",
+      "params": "0 (Analytical)"
     }
   ],
   "hardware_rules": {
@@ -3818,7 +3938,7 @@
       "paper_label": "NeurIPS 2024",
       "paper_url": "https://arxiv.org/abs/2406.16192",
       "citation": "Jaume et al., HEST-1k: A Dataset for Spatial Transcriptomics and Histology Image Analysis, NeurIPS (2024)",
-      "description": "Unified pan-cancer benchmark linking pyramidal H&E `.tif` slides, `.h5ad` spot/cell gene expression, and nuclear contours; filter `st_state == 'Cancer'` in `HEST_v1_1_0.csv` for oncology-only splits (incl. HEST-Bench).",
+      "description": "Unified pan-cancer benchmark linking pyramidal H&E `.tif` slides, `.h5ad` spot/cell gene expression, and nuclear contours; filter `disease_state == 'Cancer'` in `HEST_v1_1_0.csv` for oncology-only splits (incl. HEST-Bench).",
       "cli": "hf download MahmoodLab/hest --repo-type dataset\n# Filter oncology cohorts in Python:\n# df = pd.read_csv('HEST_v1_1_0.csv'); cancer_df = df[df['disease_state'] == 'Cancer']",
       "compatible_models": [
         "stpath",

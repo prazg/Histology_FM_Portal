@@ -276,8 +276,21 @@
     const isNum = j => rows.every(r => typeof r[j] === "number");
     const tb = h("tbody");
     const fill = () => tb.replaceChildren(...rows.map(r => h("tr", {}, r.map((c, j) => h("td", { class: isNum(j) ? "num" : "", text: fmt(c) })))));
-    const head = h("tr", {}, p.columns.map((c, j) => h("th", { class: isNum(j) ? "num" : "", scope: "col", tabindex: 0, text: c,
-      onclick: () => { dir = sortCol === j ? -dir : 1; sortCol = j; rows.sort((a, b) => (a[j] > b[j] ? 1 : a[j] < b[j] ? -1 : 0) * dir); fill(); } })));
+    const ths = p.columns.map((c, j) => {
+      const doSort = () => {
+        dir = sortCol === j ? -dir : 1;
+        sortCol = j;
+        rows.sort((a, b) => (a[j] > b[j] ? 1 : a[j] < b[j] ? -1 : 0) * dir);
+        ths.forEach((th, idx) => th.setAttribute("aria-sort", idx === sortCol ? (dir === 1 ? "ascending" : "descending") : "none"));
+        fill();
+      };
+      return h("th", {
+        class: isNum(j) ? "num" : "", scope: "col", tabindex: 0, "aria-sort": "none", text: c,
+        onclick: doSort,
+        onkeydown: e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); doSort(); } }
+      });
+    });
+    const head = h("tr", {}, ths);
     fill();
     box.append(h("div", { class: "table-wrap" }, h("table", { class: "data" }, h("thead", {}, head), tb)));
     return box;
